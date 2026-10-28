@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import DerivedKeys
+import DerivedKeysUIKit
 import UIKit
 
 /// A resolved named font, rather than a view or an ambient Dynamic Type dependency.
@@ -242,8 +243,8 @@ public final class TextComponentMeasurer {
         context: MeasurementContext
     ) -> ComponentMeasurementKey {
         let inner = FittingProposal(
-            width: proposal.width.subtracting(input.padding.left + input.padding.right),
-            height: proposal.height.subtracting(input.padding.top + input.padding.bottom)
+            width: Self.subtracting(input.padding.left + input.padding.right, from: proposal.width),
+            height: Self.subtracting(input.padding.top + input.padding.bottom, from: proposal.height)
         )
         let text = TextMeasurementKey(
             dependencies: TextMeasurementDependencies(input: input.text, proposal: inner),
@@ -324,7 +325,7 @@ public final class TextComponentMeasurer {
         label.lineBreakMode = dependencies.input.lineBreak.uiMode
         label.semanticContentAttribute = .forceLeftToRight
         return roundAndClamp(
-            label.sizeThatFits(uiSize(dependencies.proposal)),
+            label.sizeThatFits(dependencies.proposal.fittingSize),
             proposal: dependencies.proposal,
             context: context
         )
@@ -338,8 +339,8 @@ public final class TextComponentMeasurer {
         let horizontal = input.style.horizontalInset * 2
         let vertical = input.style.verticalInset * 2
         let contentProposal = FittingProposal(
-            width: dependencies.proposal.width.subtracting(horizontal),
-            height: dependencies.proposal.height.subtracting(vertical)
+            width: subtracting(horizontal, from: dependencies.proposal.width),
+            height: subtracting(vertical, from: dependencies.proposal.height)
         )
         let label = UILabel()
         label.text = input.title
@@ -347,7 +348,7 @@ public final class TextComponentMeasurer {
         label.numberOfLines = 1
         label.lineBreakMode = .byTruncatingTail
         label.semanticContentAttribute = .forceLeftToRight
-        let size = label.sizeThatFits(uiSize(contentProposal))
+        let size = label.sizeThatFits(contentProposal.fittingSize)
         return roundAndClamp(
             CGSize(width: size.width + CGFloat(horizontal), height: size.height + CGFloat(vertical)),
             proposal: dependencies.proposal,
@@ -355,15 +356,10 @@ public final class TextComponentMeasurer {
         )
     }
 
-    private static func uiSize(_ proposal: FittingProposal) -> CGSize {
-        CGSize(
-            width: proposal.width.limit.map {
-                CGFloat($0)
-            } ?? CGFloat.greatestFiniteMagnitude,
-            height: proposal.height.limit.map {
-                CGFloat($0)
-            } ?? CGFloat.greatestFiniteMagnitude
-        )
+    private static func subtracting(_ points: Double, from dimension: FittingDimension) -> FittingDimension {
+        guard let limit = dimension.limit else { return .unconstrained }
+        // Both operands are validated finite nonnegative values; subtraction is clamped at zero.
+        return try! FittingDimension(points: max(0, limit - points))
     }
 
     private static func roundAndClamp(

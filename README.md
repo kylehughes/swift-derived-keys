@@ -5,67 +5,123 @@
 [![macOS minimum: 13+](https://img.shields.io/badge/macOS-13%2B-007AFF)](#compatibility)
 [![iOS minimum: 16+](https://img.shields.io/badge/iOS-16%2B-007AFF)](#compatibility)
 
-DerivedKeys builds hashable keys from the inputs that affect a calculation. An exporter can reuse its output after a selection changes; a text component can reuse its measured size across different views with equivalent content and fitting bounds. Model identity and general-purpose equality stay unchanged.
+DerivedKeys caches calculations by the inputs that affect their results. A custom UIKit view can reuse its measured size and child frames when its content and fitting bounds are unchanged, including across different view instances. Model identity and general-purpose equality stay unchanged.
 
 The package separates dependency selection, immutable key snapshots, and a bounded LRU cache. Use concrete keys for fixed schemas, or compose live sources when the dependency graph is assembled at runtime. Equal keys must mean interchangeable results; the library cannot discover missing dependencies for you.
 
-## Reuse an export after a UI change
+## Cache a custom view's layout
 
-This exporter retains its cache across requests. It captures the content and format once, then calculates from that same snapshot. Selection is deliberately absent because the exporter never reads it.
+Add the `DerivedKeysUIKit` product for this example. `LabelView` uses manual frames and retains a bounded cache for its lifetime. Both `sizeThatFits(_:)` and `layoutSubviews()` request the same layout: the supplied width and the text's natural height. The cached result contains the complete size and label frame.
 
 ```swift
-import DerivedKeys
+import DerivedKeysUIKit
+import UIKit
 
-enum ExportOperation {}
+@MainActor
+final class LabelView: UIView {
+    enum Operation {}
+    struct Context: Hashable {}
+    struct Layout {
+        let size: CGSize
+        let labelFrame: CGRect
+    }
 
-struct Document {
-    var text: String
-    var isSelected: Bool
-}
+    private let cache = LayoutCache<Operation, String, Context, Layout>(capacity: 32)
+    private let label = UILabel()
 
-struct ExportInput: Hashable {
-    let text: String
-    let uppercase: Bool
-}
-
-struct Exporter {
-    private var cache = MemoizationCache<
-        RequestKey<ExportOperation, ExportInput, String>, String
-    >(capacity: 32)
-
-    mutating func export(_ document: Document, uppercase: Bool) -> String {
-        let input = ExportInput(text: document.text, uppercase: uppercase)
-        let key = RequestKey(
-            operation: ExportOperation.self,
-            dependencies: input,
-            context: "plain-text"
-        )
-        return cache.value(for: key) {
-            input.uppercase ? input.text.uppercased() : input.text
+    var text: String {
+        didSet {
+            label.text = text
+            setNeedsLayout()
         }
     }
-}
 
-var exporter = Exporter()
-var document = Document(text: "Hello", isSelected: false)
-let first = exporter.export(document, uppercase: false)
-document.isSelected = true
-let second = exporter.export(document, uppercase: false) // Retained cache hit.
-let capitals = exporter.export(document, uppercase: true) // Different key.
-assert(first == second && capitals == "HELLO")
+    init(text: String) {
+        self.text = text
+        super.init(frame: .zero)
+        Self.configure(label, text: text)
+        addSubview(label)
+    }
+
+    required init?(coder: NSCoder) {
+        text = ""
+        super.init(coder: coder)
+        Self.configure(label, text: text)
+        addSubview(label)
+    }
+
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        layout(forWidth: size.width)?.size ?? .zero
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        label.frame = layout(forWidth: bounds.width)?.labelFrame
+            .offsetBy(dx: bounds.minX, dy: bounds.minY) ?? .zero
+    }
+
+    private func layout(forWidth width: CGFloat) -> Layout? {
+        guard let proposal = try? FittingProposal(
+            fitting: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        ) else { return nil }
+
+        return cache.value(for: text, proposal: proposal, context: Context()) { text, proposal, _ in
+            let padding: CGFloat = 12
+            let width = proposal.fittingSize.width
+            let unbounded = proposal.width.limit == nil
+            let innerWidth = unbounded ? width : max(0, width - padding * 2)
+            let measuringLabel = UILabel()
+            Self.configure(measuringLabel, text: text)
+            let measured = innerWidth > 0
+                ? measuringLabel.sizeThatFits(CGSize(width: innerWidth, height: CGFloat.greatestFiniteMagnitude))
+                : .zero
+            let height = ceil(measured.height)
+            let outerWidth = unbounded ? ceil(measured.width) + padding * 2 : width
+            return Layout(
+                size: CGSize(width: outerWidth, height: height + padding * 2),
+                labelFrame: CGRect(
+                    x: min(padding, outerWidth / 2), y: padding,
+                    width: max(0, outerWidth - padding * 2), height: height
+                )
+            )
+        }
+    }
+
+    private static func configure(_ label: UILabel, text: String) {
+        label.text = text
+        label.font = .systemFont(ofSize: 17)
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.textAlignment = .left
+        label.semanticContentAttribute = .forceLeftToRight
+    }
+}
 ```
 
-A small app can use its own `Hashable` request struct and dictionary. DerivedKeys supplies reusable composition, nominal operation separation, live-source evaluation, and bounded eviction when those would otherwise be repeated across calculations. It does not make an incomplete dependency projection correct.
+The parent measures the view and assigns its frame on the main actor:
+
+```swift
+let view = LabelView(text: "A paragraph whose height depends on its available width.")
+let size = view.sizeThatFits(CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
+view.frame = CGRect(origin: CGPoint(x: 20, y: 20), size: size)
+view.layoutIfNeeded() // Reuses the layout calculated by sizeThatFits.
+```
+
+Changing the text or width produces a different key. Repeated fitting and layout reuse the retained result. Paint-only changes can leave the key unchanged. The miss calculation configures a fresh label from the captured text, so it measures the same inputs used to form the key.
+
+This example fixes typography, wrapping, direction, and padding, so its context is empty. It ignores proposed height, rounds height to whole points, and fills a finite proposed width. Widths smaller than the padding yield a zero-width label; invalid widths return zero. The greatest-finite-magnitude sentinel requests natural width. These are the view's policies: the cache itself neither rounds nor clamps results. If your layout reads fonts, traits, insets, or other state, capture those values in its inputs or context.
+
+The [tested implementation](Sources/DerivedKeysUIExample/LabelView.swift) also supports injecting a shared cache. The [UIKit guide](Examples/UI-Measurement.md) covers fitting, sharing, and composing child keys. A small view with a single remembered size may need only its own request struct and stored result; DerivedKeys adds complete request composition and bounded reuse across multiple inputs.
 
 ## Installation
 
-Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies and select the `DerivedKeys` product. Repository access is required. The development reference is `main`:
+Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies and select `DerivedKeysUIKit` for view layout caching or `DerivedKeys` for the generic key and cache APIs. Repository access is required. The development reference is `main`:
 
 ```swift
 .package(url: "https://github.com/kylehughes/swift-derived-keys", branch: "main")
 ```
 
-Then add `.product(name: "DerivedKeys", package: "swift-derived-keys")` to your target's dependencies. The optional `DerivedKeysUIExample` product contains the [UIKit measurement example](Examples/UI-Measurement.md).
+Then add `.product(name: "DerivedKeysUIKit", package: "swift-derived-keys")` to your target's dependencies. Add the `DerivedKeys` product too when importing its lower-level APIs directly. The core uses only the Swift standard library; `DerivedKeysUIKit` adds fitting proposals and main-actor layout caching. Demonstration views remain example source, separate from the supported library products.
 
 ## Selecting dependencies
 
@@ -76,6 +132,14 @@ Use a small `Hashable` value struct for the inputs of one operation. `RequestKey
 `OriginalKey` labels one captured value. `DerivedKey` labels a composition, and `KeyPair` holds two heterogeneous children without type erasure. Domain structs make larger fixed schemas readable. `KeyProjection` stores a reusable synchronous function from explicit input to dependencies:
 
 ```swift
+import DerivedKeys
+
+enum ExportOperation {}
+struct ExportInput: Hashable {
+    let text: String
+    let uppercase: Bool
+}
+
 let projection = KeyProjection(operation: ExportOperation.self) { (input: ExportInput) in
     DerivedKey("export", children: input)
 }
@@ -117,19 +181,19 @@ Arrays preserve order. For unordered inputs, use a `Set`, a dictionary with its 
 
 The cache is a value type with exclusive mutation. Copies evolve independently, with standard-library copy-on-write costs on later mutation. Reentering the same cache during its calculation is unsupported; separate caches can be composed. Results, like keys, must not change meaning through mutable external aliases. Computations whose side effects must run on every call do not belong in this cache.
 
-Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement. The optional UIKit adapter is main-actor isolated and captures plain values there.
+Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement. `DerivedKeysUIKit.LayoutCache` is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities.
 
 Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. Use reusable immutable projections at controlled content-mutation boundaries when profiling warrants it. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
 
 ## Examples and documentation
 
-Run the non-UI exporter with `swift run DocumentExportExample`. It uses ordered paragraphs, format, and export options, while ignoring selection and scrolling. It imports no UI framework. The [UI measurement example](Examples/UI-Measurement.md) composes child request keys and automatically includes effective fitting proposals in both keys and sizing.
+The [UIKit guide](Examples/UI-Measurement.md) covers complete layout caching, shared ownership, and request composition. The [text/button example](Examples/Text-Component.md) shows independently cached child measurements. For a non-UI use, read the [document exporter](Examples/Document-Export.md) or run `swift run DocumentExportExample`; it uses ordered paragraphs, format, and export options while ignoring selection and scrolling.
 
-The [DocC overview](Documentation/DerivedKeys.docc/DerivedKeys.md) links the API contracts and [dependency design guide](Documentation/DerivedKeys.docc/DependencyDesign.md). [Release benchmarks](Benchmarks/README.md) separate key work from computation, explain workloads, and report memory-measurement limits.
+The [UIKit API overview](Documentation/DerivedKeysUIKit.docc/DerivedKeysUIKit.md) covers fitting and cache contracts. The [core overview](Documentation/DerivedKeys.docc/DerivedKeys.md) links the key APIs and [dependency design guide](Documentation/DerivedKeys.docc/DependencyDesign.md). [Release benchmarks](Benchmarks/README.md) separate key work from computation, explain workloads, and report memory-measurement limits.
 
 ## Compatibility
 
-The package declares Swift tools 6.4, Swift 6 language mode, macOS 13.0+, and iOS 16.0+. Default actor isolation is nonisolated; Swift 6 strict concurrency checking applies. Every owned Swift target treats compiler warnings as errors. `DerivedKeys` uses only the Swift standard library. UIKit measurement declarations exist only where UIKit is available; the optional target's validated fitting values also compile on macOS.
+The package declares Swift tools 6.4, Swift 6 language mode, macOS 13.0+, and iOS 16.0+. Default actor isolation is nonisolated; Swift 6 strict concurrency checking applies. Every owned Swift target treats compiler warnings as errors. `DerivedKeys` uses only the Swift standard library. `DerivedKeysUIKit` uses CoreGraphics for fitting geometry; its proposals and cache also compile on macOS. The example views and UIKit measurement tests exist only where UIKit is available.
 
 ## Maintenance
 
@@ -139,6 +203,7 @@ From the repository root with Xcode 27.1 selected and Python 3 installed:
 swift build
 swift test --enable-code-coverage
 swift build -c release
+python3 Scripts/check-tests.py --configuration release
 python3 Scripts/check-concurrency.py --warnings-policy
 python3 Scripts/test-check-simulator.py
 python3 Scripts/check-simulator.py
@@ -146,7 +211,7 @@ swift format lint --strict --recursive Package.swift Sources Tests
 python3 Scripts/docs.py --output .build/docc-site
 ```
 
-Choose a fresh output directory for each DocC build. The static site's entry is `/swift-derived-keys/documentation/derivedkeys/`; serve the output beneath `/swift-derived-keys/` to test deep links. The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) build/test the package, prepare static documentation, and provide a manual release operation. Documentation deployment requires explicitly selecting `deploy` on a manual run and configuring Pages access appropriate to the repository. A documentation build alone does not deploy it.
+Choose a fresh output directory for each DocC build. The static site's entry is `/swift-derived-keys/documentation/`, with module pages at `derivedkeys/` and `derivedkeysuikit/` beneath it; serve the output beneath `/swift-derived-keys/` to test deep links. The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) build/test the package, prepare static documentation, and provide a manual release operation. Documentation deployment requires explicitly selecting `deploy` on a manual run and configuring Pages access appropriate to the repository. A documentation build alone does not deploy it.
 
 The manual release workflow requires a version, exact candidate commit, and supplied notes unless generated notes are explicitly selected. It verifies the candidate before a separate publisher creates release artifacts. Deployment, tags, releases, and repository visibility changes require their own authorization. Keep README examples, API comments, compiler fixtures, and compatibility settings synchronized when changing the public contract.
 

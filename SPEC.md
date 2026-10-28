@@ -187,7 +187,15 @@ Choose one owner for mutable cache storage: exclusive value ownership, an actor,
 
 Avoid ownership cycles between an owner, its stored sources, and their closures. Prefer passing explicit input snapshots. If a weak owner capture is used, represent owner disappearance explicitly; do not fabricate a default dependency that might hit an unrelated valid entry.
 
-**8. UI measurement example**
+**8. Reusable UIKit support and UI measurement examples**
+
+Vend a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
+
+Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
+
+The README's primary example is a custom `UIView` using manual frames. Cache one immutable result containing the fitted size and child frames, and reuse it from `sizeThatFits(_:)` and `layoutSubviews()` using the same effective width-only proposal. Show parent measurement/frame assignment and content-driven layout scheduling. Keep the demonstration implementation compiled and tested. Typography and direction may be fixed for this introductory example if documented.
+
+Keep example-specific text/font/button policies in a non-product example target. Built-in text measurement helpers and Auto Layout integration are outside the production adapter's scope. Retain the richer child-composition example below as a secondary demonstration.
 
 Demonstrate a text component containing content and an optional expansion button.
 
@@ -295,7 +303,7 @@ Deliver:
 
 - A Swift package containing the generic key/source abstractions.
 - The bounded generic reference cache.
-- A UI measurement example or separate optional adapter.
+- A supported `DerivedKeysUIKit` product and tested custom frame-layout view example, plus a secondary text/button composition example.
 - A runnable non-UI example.
 - API documentation covering equality, dependency completeness, evaluation timing, isolation, lifetimes, and complexity.
 - Automated tests and reproducible release benchmarks.

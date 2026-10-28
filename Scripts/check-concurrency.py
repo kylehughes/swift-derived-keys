@@ -62,7 +62,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--warnings-policy", action="store_true", help="Also compile debug/release warning-policy probes")
     args = parser.parse_args()
-    subprocess.run(["swift", "build", "--target", "DerivedKeys"], cwd=ROOT, check=True, timeout=600)
+    subprocess.run(["swift", "build", "--target", "DerivedKeysUIKit"], cwd=ROOT, check=True, timeout=600)
     binaries = Path(output(["swift", "build", "--show-bin-path"]))
     modules = binaries / "Modules" if (binaries / "Modules").is_dir() else binaries
     if not (modules / "DerivedKeys.swiftmodule").exists():

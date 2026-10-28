@@ -36,6 +36,9 @@ jobs:
     - name: Test selected cases
       run: python3 Scripts/check-tests.py
       timeout-minutes: 15
+    - name: Test selected release cases
+      run: python3 Scripts/check-tests.py --configuration release
+      timeout-minutes: 15
     - name: Simulator observation controls
       run: python3 Scripts/test-check-simulator.py
       timeout-minutes: 5

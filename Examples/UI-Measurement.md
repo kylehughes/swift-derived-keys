@@ -1,92 +1,68 @@
-# Measuring a text component
+# Caching a custom UIKit layout
 
-`DerivedKeysUIExample` is an optional library target. Its UIKit adapter measures a
-vertical stack of plain text and an optional expansion button. The generic
-`DerivedKeys` library has no UIKit dependency. Validated fitting values are also
-available on macOS; UIKit declarations and tests use `#if canImport(UIKit)`.
+Add the `DerivedKeysUIKit` product to your app target and import it alongside UIKit. The [README](../README.md#cache-a-custom-views-layout) shows a complete frame-based `UIView`. Its [compiled example](../Sources/DerivedKeysUIExample/LabelView.swift) caches a `Layout` containing an overall size and a label frame. The example target is not a package product; copy and adapt the view in your app.
+
+## Capture one request
+
+`LayoutCache<Operation, Input, Context, Value>` is a main-actor reference type. Declare a distinct operation enum for each layout algorithm, capture its content in a `Hashable` input, and capture any consumed environment in a `Hashable` context. The result can be `CGSize` or an immutable structure containing all the frames and sizes your view needs.
 
 ```swift
-import DerivedKeysUIExample
+import DerivedKeysUIKit
+import UIKit
+
+enum BadgeLayout {}
+struct Environment: Hashable { let fontSize: CGFloat }
 
 @MainActor
-func example() throws {
-    let font = try MeasurementFont(name: "Helvetica", pointSize: 17)
-    let text = try TextMeasurementInput(
-        text: "A paragraph that can expand.", font: font,
-        numberOfLines: 3, lineBreak: .truncatingTail
-    )
-    let input = try TextComponentInput(
-        text: text,
-        button: ButtonMeasurementInput(title: "Show more", font: font, style: .padded),
-        padding: MeasurementInsets(top: 8, left: 12, bottom: 8, right: 12),
-        spacing: 6
-    )
-    let proposal = try FittingProposal(width: FittingDimension(points: 240))
-    let context = try MeasurementContext(displayScale: 2)
-    let measurer = TextComponentMeasurer(capacity: 64)
-    let size = measurer.size(for: input, proposal: proposal, context: context)
-    // Publish size to the container using the application's normal layout API.
-    _ = size
+func measureBadge() throws -> CGSize {
+    let cache = LayoutCache<BadgeLayout, String, Environment, CGSize>(capacity: 32)
+    let proposal = try FittingProposal(fitting: CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
+    return cache.value(for: "Unread", proposal: proposal, context: Environment(fontSize: 17)) {
+        text, proposal, environment in
+        let label = UILabel()
+        label.text = text
+        label.font = .systemFont(ofSize: environment.fontSize)
+        label.numberOfLines = 1
+        label.textAlignment = .left
+        label.semanticContentAttribute = .forceLeftToRight
+        return label.sizeThatFits(proposal.fittingSize)
+    }
 }
 ```
 
-Keep the measurer alive across requests to retain its caches. Capture a coherent
-snapshot within the model's mutation owner. The main-actor API does not suspend,
-and uses the same snapshot for both key formation and calculation. It does not
-retain a model, callback, provider, or view.
+This function illustrates one request; retain the cache in your view or another main-actor owner to reuse results across requests. The cache automatically includes the effective fitting proposal in its key, then supplies the captured input, proposal, and context to the calculation. Measure from those arguments. Reading other mutable view or model properties inside the callback can produce an incomplete key even on the main actor.
 
-## Inputs consumed by this algorithm
+Capture actual text and metric-affecting styles, not only a model ID. Include resolved fonts, line limits, insets, layout direction, or relevant traits when the algorithm consumes them. Include display scale if your own rounding depends on it. An empty context is appropriate only when no variable environment affects the calculation. Hashable reference values can still have mutable aliases; project stable values and keep cached results stable too.
 
-The text child key contains rendered plain text, a concrete named font and point
-size, line count, wrapping/truncation policy, effective inner width and height,
-and display scale. `MeasurementFont` resolves the name on the main actor; resolve
-Dynamic Type to a concrete point size before constructing it. The example does
-not accept arbitrary font descriptors, attributed text, paragraph styles,
-attachments, images, or fitting priorities. It does not perform locale-dependent
-formatting. Labels use forced left-to-right semantic direction and UIKit's
-plain-text shaping and `sizeThatFits`; the font environment is process-local.
+## Match fitting to layout
 
-The button child key contains its title, font, style, effective inner bounds, and
-display scale. Its single-line title truncates at the tail. `plain` adds no
-content insets; `padded` adds 12 points on each horizontal side and 6 on each
-vertical side. Style here is this explicit metric policy, not UIButton's ambient
-configuration or a paint style.
+`FittingDimension(points:)` accepts finite nonnegative bounds. `.unconstrained` represents the absence of a bound. `FittingProposal(fitting:)` maps each `CGFloat.greatestFiniteMagnitude` dimension to `.unconstrained`; `fittingSize` maps it back for UIKit. NaN, infinity, and negative dimensions throw `FittingProposalError.invalidDimension`. Zero is a real bound.
 
-The parent key contains the complete text child key, the optional button child
-key, padding, visible-button spacing, outer proposal, and context. Hidden buttons
-have no child key, so their title, style, font, and callback cannot invalidate the
-parent. Spacing is normalized to zero when no button exists. Parent keys compose
-child dependency keys, rather than sizes or hashes. All three operations have
-separate nominal namespaces and independently bounded LRU caches.
+The bridge reserves the greatest finite value as a sentinel. A manually constructed finite dimension with that exact value becomes unconstrained if converted through `CGSize` and back. Other finite bounds are preserved without quantization.
 
-Both children fit within the outer proposal minus padding. The parent stacks
-their independently measured sizes, adds visible-button spacing and padding,
-rounds upward to the display pixel grid, and clamps to the outer width and height.
-A bounded height can therefore clip the stack; this example does not allocate
-remaining height between the children. Child results also round and clamp. A
-non-pixel-aligned bound wins over pixel rounding. Extreme finite products avoid
-overflow in rounding by leaving that dimension unrounded.
+The cache neither clamps nor rounds a result. Pass the proposal you actually use for measurement. If your algorithm intentionally ignores height, construct a width-only proposal in both `sizeThatFits(_:)` and `layoutSubviews()`; keying one with natural height and the other with `bounds.height` would describe different requests.
 
-## Validation and reuse
+The README view fills a finite requested width and returns natural height. A parent assigns the fitted frame before normal UIKit layout. A natural-width request uses an unconstrained proposal, so assigning its finite result produces a distinct request on the following layout pass. Widths below the fixed padding yield zero-width text; invalid widths return zero at the view boundary. These are example policies, not rules imposed by the library.
 
-`FittingDimension(points:)` accepts finite nonnegative dimensions and rejects
-NaN, infinity, and negatives with `MeasurementInputError.invalidDimension`.
-Use `.unconstrained` explicitly; the UIKit adapter translates it to
-`CGFloat.greatestFiniteMagnitude` only when calling `sizeThatFits`. It never
-silently interprets raw infinity as a valid bound. No proposal quantization is
-performed. Insets and spacing are finite and nonnegative; inset totals must
-remain finite. Display scale must be finite and positive, named fonts must resolve
-at a finite positive size, and line count must be nonnegative. Validation uses
-immutable private storage with no decoding or raw-value construction path.
+## Share and compose
 
-Project actual content into the key, even when an entity ID stays unchanged.
-Paint-only colors, analytics identifiers, unrelated URLs, actions, and view
-identity are excluded because the sizing algorithm does not read them. Two
-different views with equal snapshots can share sizes. A reused view with changed
-content supplies a new snapshot. A→B→A inputs recover the original key and may
-reuse its retained entry.
+Retain a cache per view, or inject one cache into several equivalent views. References share entries, capacity, and LRU recency. The example view supports explicit sharing:
 
-Changing a dependency, asking for a size, scheduling layout, and publishing that
-size are separate application actions. These keys do not trigger layout or
-observe model changes. The calculation counters demonstrate reuse; they are
-diagnostics rather than dependencies.
+```swift
+// With the example LabelView copied into your app:
+let cache = LabelView.Cache(capacity: 64)
+let first = LabelView(text: "Shared content", cache: cache)
+let second = LabelView(text: "Shared content", cache: cache)
+```
+
+The README uses a minimal per-view declaration; the [full source](../Sources/DerivedKeysUIExample/LabelView.swift) adds this initializer and calculation counters. Two views with equal captured inputs and proposals can share a result without including view identity. A reused view with changed text requests a different entry. Returning from A to B to A can reuse A while its entry remains retained.
+
+Use `key(for:proposal:context:)` when composing child layouts. It returns `LayoutKey`, a core `RequestKey` whose `LayoutInputs` contain the complete input and proposal. Store complete child keys in the parent's hashable input alongside parent-only values, rather than composing hash integers or measured sizes. Distinct operation types and the cache's fixed `version` separate algorithms. The [text/button demonstration](Text-Component.md) illustrates independently cached children and an optional child dependency.
+
+## Ownership and invalidation
+
+Capacity counts entries, not bytes. Zero disables storage. Hits promote entries; successful misses insert and evict the least recently used entry when necessary. Throwing calculations propagate without insertion or eviction, and cached optional `nil` results are hits. `removeValue(for:)` accepts a complete key; `removeAll()` clears entries for every owner sharing that cache.
+
+Entries retain inputs, context, and results. The callback is nonescaping and is never stored. Caller-provided values can themselves retain views or other objects, so use immutable geometry results when that is what the cache should own. Do not reenter the same cache during a calculation, including through another reference.
+
+Changing content, requesting a new layout result, scheduling UIKit layout, and updating a container's frame are separate application actions. The library observes no models and schedules no layout. A text change can call `setNeedsLayout()` without clearing old entries; the parent still needs to refit the view when its desired outer size changes.

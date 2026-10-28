@@ -10,55 +10,6 @@ public enum MeasurementInputError: Error, Equatable, Sendable {
     case invalidLineCount
 }
 
-/// A finite nonnegative bound, or an explicit absence of a bound.
-public struct FittingDimension: Hashable, Sendable {
-    private let storage: Double?
-
-    /// An unconstrained dimension, translated to UIKit's fitting sentinel by the adapter.
-    public static let unconstrained = Self(storage: nil)
-
-    /// The bound in points, or `nil` when unconstrained.
-    public var limit: Double? {
-        storage
-    }
-
-    /// Creates a finite nonnegative bound.
-    ///
-    /// Infinity is not an unconstrained spelling.
-    public init(points: Double) throws {
-        guard points.isFinite, points >= 0 else {
-            throw MeasurementInputError.invalidDimension
-        }
-        storage = points == 0 ? 0 : points
-    }
-
-    private init(storage: Double?) {
-        self.storage = storage
-    }
-
-    func subtracting(_ points: Double) -> Self {
-        Self(
-            storage: storage.map {
-                max(0, $0 - points)
-            }
-        )
-    }
-}
-
-/// The exact bounds used both in request keys and in the sizing calculation.
-public struct FittingProposal: Hashable, Sendable {
-    /// The available horizontal extent.
-    public let width: FittingDimension
-    /// The available vertical extent.
-    public let height: FittingDimension
-
-    /// Creates a proposal with an unconstrained height unless one is supplied.
-    public init(width: FittingDimension, height: FittingDimension = .unconstrained) {
-        self.width = width
-        self.height = height
-    }
-}
-
 /// Finite nonnegative layout insets, measured in points.
 public struct MeasurementInsets: Hashable, Sendable {
     private let storedTop: Double

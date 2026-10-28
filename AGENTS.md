@@ -3,7 +3,8 @@
 DerivedKeys separates dependency selection, immutable semantic keys, and synchronous bounded LRU reuse. Read [README.md](README.md) for public behavior and maintenance commands; [SPEC.md](SPEC.md) owns the implementation requirements.
 
 - `DerivedKeys` is standard-library-only and nonisolated. Keep UI types out of this target.
-- `DerivedKeysUIExample` contains validated fitting inputs and a conditional UIKit adapter. Measurement runs on the main actor. See [the example](Examples/UI-Measurement.md) for its exact sizing policy.
+- `DerivedKeysUIKit` is the supported fitting and layout-cache product. Its main-actor reference cache automatically keys the effective fitting proposal; captured inputs and result values remain caller-owned semantic contracts.
+- `DerivedKeysUIExample` is a non-product target containing tested frame-layout and text/button examples. See [the UIKit guide](Examples/UI-Measurement.md) for fitting, cache sharing, and application layout responsibilities.
 - `DocumentExportExample` is a runnable non-UI consumer; `DerivedKeysBenchmarks` measures key work and cache behavior in release mode.
 - Swift tools 6.4, Swift 6 mode, macOS 13/iOS 16 minima, and warnings as errors are declared in `Package.swift`. Preserve those axes separately.
 

@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import DerivedKeysUIExample
+import DerivedKeysUIKit
 import Testing
 import UIKit
 

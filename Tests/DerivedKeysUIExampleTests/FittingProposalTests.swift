@@ -1,10 +1,11 @@
 import DerivedKeysUIExample
+import DerivedKeysUIKit
 import Testing
 
 struct FittingProposalTests {
     @Test(arguments: [Double.nan, .infinity, -.infinity, -1])
     func invalidDimensionsAreRejected(points: Double) {
-        #expect(throws: MeasurementInputError.invalidDimension) {
+        #expect(throws: FittingProposalError.invalidDimension) {
             try FittingDimension(points: points)
         }
         #expect(throws: MeasurementInputError.invalidDimension) {
