@@ -7,12 +7,12 @@ benchmark_output=${BENCHMARK_OUTPUT_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/derivedkey
 mkdir -p "$benchmark_output"
 benchmark_output=$(cd "$benchmark_output" && pwd)
 
-benchmark_build_options=()
+benchmark_build_options=(-c release)
 if [[ -n "${BENCHMARK_SCRATCH_PATH:-}" ]]; then
     benchmark_build_options+=(--scratch-path "$BENCHMARK_SCRATCH_PATH")
 fi
-swift build -c release "${benchmark_build_options[@]}" --product DerivedKeysBenchmarks
-benchmark_bin_dir=$(swift build -c release "${benchmark_build_options[@]}" --show-bin-path)
+swift build "${benchmark_build_options[@]}" --product DerivedKeysBenchmarks
+benchmark_bin_dir=$(swift build "${benchmark_build_options[@]}" --show-bin-path)
 benchmark_binary="$benchmark_bin_dir/DerivedKeysBenchmarks"
 
 {

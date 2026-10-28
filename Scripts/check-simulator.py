@@ -15,6 +15,20 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import uuid
 
 
+def canonical_test_identity(identity):
+    """XCTest omits empty parentheses in URLs and sometimes in enumeration."""
+    method = identity.rsplit("/", 1)[-1]
+    return identity[:-2] if method.endswith("()") and ":" not in method else identity
+
+
+def test_identity_matches_url(identity, value):
+    address = urlsplit(value)
+    path = unquote(address.path)
+    return (address.scheme == "test" and address.netloc == "com.apple.xcode"
+            and not address.query and not address.fragment
+            and canonical_test_identity(path).endswith("/" + canonical_test_identity(identity)))
+
+
 def selected_tests(enumeration, targets):
     if not targets or len(targets) != len(set(targets)):
         raise ValueError("Manifest has missing or duplicate test targets")
@@ -29,7 +43,7 @@ def selected_tests(enumeration, targets):
             if len(identity.split("/")) < 3:
                 raise ValueError("Enumeration contains an invalid individual identity")
             selected.append(identity)
-    if not selected or len(selected) != len(set(selected)):
+    if not selected or len(selected) != len({canonical_test_identity(case) for case in selected}):
         raise ValueError("Enumeration has zero or duplicate individual tests")
     if {case.split("/", 1)[0] for case in selected} != set(targets):
         raise ValueError("Enumeration differs from manifest test targets")
@@ -59,8 +73,7 @@ def observe_results(selection, targets, report, summary, device_id):
             identifier = node.get("nodeIdentifier", "")
             identity = f"{target}/{identifier}"
             address = urlsplit(node.get("nodeIdentifierURL", ""))
-            if (not target or not identifier or address.scheme != "test" or address.netloc != "com.apple.xcode"
-                    or not unquote(address.path).endswith("/" + identity)):
+            if not target or not identifier or not test_identity_matches_url(identity, node.get("nodeIdentifierURL", "")):
                 raise ValueError("Result identity has no matching bundle and URL")
             cases.append(identity)
             parameterized = ":" in identifier.rsplit("/", 1)[-1]
@@ -86,7 +99,7 @@ def observe_results(selection, targets, report, summary, device_id):
         visit(node)
     if Counter(bundles) != Counter(targets):
         raise ValueError("Execution is missing or repeating a manifest test target")
-    if Counter(cases) != Counter(selection):
+    if Counter(map(canonical_test_identity, cases)) != Counter(map(canonical_test_identity, selection)):
         raise ValueError("Executed individual test identities differ from enumeration")
     if len(arguments) != len(set(arguments)):
         raise ValueError("Execution has duplicate argument identities")

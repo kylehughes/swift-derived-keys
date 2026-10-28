@@ -1,6 +1,6 @@
 # Size-facade release sample
 
-This sample records one run of the [benchmark suite](README.md#size-facade-workload-and-cases) on 2026-10-28 at 20:24 UTC. Each case ran once in a separate process. These are measurements of synthetic byte-mixing calculations through `SizeCache`, not UIKit fitting measurements or a performance guarantee.
+This sample records one run of the [benchmark suite](Synthetic.md#size-facade-workload-and-cases) on 2026-10-28 at 20:24 UTC. Each case ran once in a separate process. These are measurements of synthetic byte-mixing calculations through `SizeCache`, not UIKit fitting measurements or a performance guarantee.
 
 ```sh
 BENCHMARK_SCRATCH_PATH=.build/size-benchmark-build \

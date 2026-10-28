@@ -19,7 +19,7 @@ Benchmarks/run.sh
 
 ## Timings and computation counts
 
-The times are means within each named loop, in microseconds per operation. Projection rows include assignment into a preallocated observation array. Hash rows use preconstructed keys. The [method definitions](README.md#workload-and-cases) explain setup and costs included in each phase.
+The times are means within each named loop, in microseconds per operation. Projection rows include assignment into a preallocated observation array. Hash rows use preconstructed keys. The [method definitions](Synthetic.md#workload-and-cases) explain setup and costs included in each phase.
 
 | Case / phase | µs/operation | Measured calculations | Final cache entries |
 | --- | ---: | ---: | ---: |

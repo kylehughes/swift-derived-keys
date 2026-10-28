@@ -1,0 +1,2022 @@
+{
+  "recordedUTC": "2026-10-28T22:04:59Z",
+  "trials": 5,
+  "measurements": [
+    {
+      "variant": "baseline",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 2671222584,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 2671222.584,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 83050209,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 83050.209,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "baseline",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 43044958,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 43044.958,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42261375,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42261.375,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "14571169246407198577",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1824250,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1824.25,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "8874332128598091643",
+      "computationCount": 0,
+      "elapsedNanoseconds": 830542709,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 830542.709,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 2644228500,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 2644228.5,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "16383440657838924551",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1913667,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1913.667,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "13698613915502503478",
+      "computationCount": 0,
+      "elapsedNanoseconds": 77073250,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 77073.25,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 79325083,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 79325.083,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "5661483847543621379",
+      "elapsedNanoseconds": 4325541,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 4325.541,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-snapshot",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "63210560500",
+      "elapsedNanoseconds": 471290125,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 471290.125,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-parent-miss",
+      "storedResultValueBytesAcrossCaches": 2080
+    },
+    {
+      "variant": "optimized",
+      "trial": 0,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 843168125,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 843168.125,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-cold",
+      "storedResultValueBytesAcrossCaches": 6144
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 82924167,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 82924.167,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "baseline",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 2657942125,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 2657942.125,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42558208,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42558.208,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42325917,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42325.917,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "18179000941930349742",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1914750,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1914.75,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "2273710870572333915",
+      "computationCount": 0,
+      "elapsedNanoseconds": 77772750,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 77772.75,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 80173291,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 80173.291,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "baseline",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "17786816387729020862",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1735916,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1735.916,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "5385593821252396308",
+      "computationCount": 0,
+      "elapsedNanoseconds": 831978292,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 831978.292,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 2678664792,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 2678664.792,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "11698287262133352293",
+      "elapsedNanoseconds": 4521833,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 4521.833,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-snapshot",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "63210560500",
+      "elapsedNanoseconds": 498225542,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 498225.542,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-parent-miss",
+      "storedResultValueBytesAcrossCaches": 2080
+    },
+    {
+      "variant": "optimized",
+      "trial": 1,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 865166125,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 865166.125,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-cold",
+      "storedResultValueBytesAcrossCaches": 6144
+    },
+    {
+      "variant": "baseline",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 2669980042,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 2669980.042,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 84616084,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 84616.084,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "baseline",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 43143334,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 43143.334,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 43260708,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 43260.708,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "1505876580635896351",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1819917,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1819.917,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "3033805299405298608",
+      "computationCount": 0,
+      "elapsedNanoseconds": 863365417,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 863365.417,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 2645396459,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 2645396.459,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "2820902953401160179",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1898916,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1898.916,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "6037803182474630524",
+      "computationCount": 0,
+      "elapsedNanoseconds": 76634083,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 76634.083,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 80847000,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 80847,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "12501738385661923374",
+      "elapsedNanoseconds": 4434542,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 4434.542,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-snapshot",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "63210560500",
+      "elapsedNanoseconds": 488071209,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 488071.209,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-parent-miss",
+      "storedResultValueBytesAcrossCaches": 2080
+    },
+    {
+      "variant": "optimized",
+      "trial": 2,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 889811375,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 889811.375,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-cold",
+      "storedResultValueBytesAcrossCaches": 6144
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 83690500,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 83690.5,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "baseline",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 2651698542,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 2651698.542,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42054042,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42054.042,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42053708,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42053.708,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "10312511256243041922",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1931958,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1931.958,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "5978048506126962091",
+      "computationCount": 0,
+      "elapsedNanoseconds": 77648750,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 77648.75,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 79709125,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 79709.125,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "baseline",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "18349601870272140726",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1752083,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1752.083,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "17294048169062193523",
+      "computationCount": 0,
+      "elapsedNanoseconds": 838334208,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 838334.208,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 2657490667,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 2657490.667,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "10588522105217710305",
+      "elapsedNanoseconds": 4303166,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 4303.166,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-snapshot",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "63210560500",
+      "elapsedNanoseconds": 506075583,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 506075.583,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-parent-miss",
+      "storedResultValueBytesAcrossCaches": 2080
+    },
+    {
+      "variant": "optimized",
+      "trial": 3,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 850869833,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 850869.833,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-cold",
+      "storedResultValueBytesAcrossCaches": 6144
+    },
+    {
+      "variant": "baseline",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 2645378542,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 2645378.542,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "parent",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "30474829000",
+      "elapsedNanoseconds": 83008583,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 83008.583,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-warm-parent",
+      "storedResultValueBytesAcrossCaches": 48
+    },
+    {
+      "variant": "baseline",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42003042,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42003.042,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 42220458,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 42220.458,
+      "payloadBytesPerChild": 4096,
+      "phase": "direct-child+parent-calculation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-direct",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "15513795978922840853",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1755792,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1755.792,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "10282593316353419467",
+      "computationCount": 0,
+      "elapsedNanoseconds": 839373250,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 839373.25,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "baseline",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 2650306125,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 2650306.125,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "3913583909044584198",
+      "computationCount": 0,
+      "elapsedNanoseconds": 1879042,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 1879.042,
+      "payloadBytes": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 0,
+      "checksum": "11673211881022992719",
+      "computationCount": 0,
+      "elapsedNanoseconds": 81472792,
+      "entryCount": 0,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 0,
+      "nanosecondsPerOperation": 81472.792,
+      "payloadBytes": 4096,
+      "phase": "hash-preconstructed-snapshot",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 0,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 0,
+      "warmupComputationCount": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "cacheCapacity": 128,
+      "checksum": "8428533684144261256",
+      "computationCount": 0,
+      "elapsedNanoseconds": 78573458,
+      "entryCount": 1,
+      "iterations": 1000,
+      "logicalPayloadBytesAcrossEntries": 4096,
+      "nanosecondsPerOperation": 78573.458,
+      "payloadBytes": 4096,
+      "phase": "snapshot+cache+computation-on-miss",
+      "requestedCapacity": 128,
+      "resultValueBytesAcrossEntries": 8,
+      "retainedMemoryAccounting": "payload references and UInt64 result bytes only; storage overhead unknown",
+      "scenario": "shared-source",
+      "uniquePayloadBytesReferencedByEntries": 4096,
+      "warmupComputationCount": 1
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 0,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "6282783595214708638",
+      "elapsedNanoseconds": 4358708,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 4358.708,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+64-slot-observation",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-snapshot",
+      "storedResultValueBytesAcrossCaches": 0
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "left",
+          "warmupComputationCount": 1
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 0,
+          "entryCount": 1,
+          "name": "right",
+          "warmupComputationCount": 1
+        }
+      ],
+      "checksum": "63210560500",
+      "elapsedNanoseconds": 486767917,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 486767.917,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-parent-miss",
+      "storedResultValueBytesAcrossCaches": 2080
+    },
+    {
+      "variant": "optimized",
+      "trial": 4,
+      "allocationMeasurement": "unknown; no allocation profiler attached",
+      "caches": [
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "parent",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "left",
+          "warmupComputationCount": 0
+        },
+        {
+          "cacheCapacity": 128,
+          "computationCount": 1000,
+          "entryCount": 128,
+          "name": "right",
+          "warmupComputationCount": 0
+        }
+      ],
+      "checksum": "23092887143",
+      "elapsedNanoseconds": 871245333,
+      "iterations": 1000,
+      "nanosecondsPerOperation": 871245.333,
+      "payloadBytesPerChild": 4096,
+      "phase": "snapshot+cache+measurement-on-miss",
+      "requestedCapacityPerCache": 128,
+      "retainedMemoryAccounting": "stored CGSize result bytes only; total retained key bytes and storage overhead unknown",
+      "scenario": "size-cold",
+      "storedResultValueBytesAcrossCaches": 6144
+    }
+  ],
+  "sourceSHA256": {
+    "baseline": {
+      "Package.swift": "05abf6bfe6b76dba5876e1426ca4a0c84b2f3b08aac2d3fc94c5f2d0574da240",
+      "Benchmarks/run.sh": "1a206f08593e69d39f87f63fa62d6059318c81130f2ad7885832e5cf4015e25e",
+      "Sources/DerivedKeys/DependencySnapshot.swift": "bd7efbf5b42084014ec6e70fa80e696402b41f86c682f0f71029a4c3f0ca0ab4",
+      "Sources/DerivedKeys/DerivedKey.swift": "208daed14c014d04b66746bd44d244c70e7913912d98e2fe182abaafeb157513",
+      "Sources/DerivedKeys/KeyPair.swift": "145659ac9d45d192dd794afb19952f9cfdf5a2372748afdbb070ad607ede9cac",
+      "Sources/DerivedKeys/KeyProjection.swift": "42aa3d1690d59cb0f605345b8e5dd8f32d5e98a800f9dd909e7e0aeb0eb7f615",
+      "Sources/DerivedKeys/KeySource.swift": "e93778ad97145c9736bcacd9e5478089b3b9d40e8f9bc51f22e02b801e0884c9",
+      "Sources/DerivedKeys/KeyValueProvider.swift": "103c87ab4a381e27684c476fcf7d8f7a9dbe0a4ed855fd00523d59273d54f096",
+      "Sources/DerivedKeys/MemoizationCache.swift": "b7ef51ab1dcd65924374b2cd903e1836751f191a147c77c6b889998ef90b49ad",
+      "Sources/DerivedKeys/OriginalKey.swift": "cde2a8f4724348294aeddedf87f828f7ae262a2647a10a31fe320c4d790de99f",
+      "Sources/DerivedKeys/RequestKey.swift": "1b31463f408f79de5306e998d79aa2b5ef1240e5ae3c8808c1e6bae4302439ac",
+      "Sources/DerivedKeysUI/SizeCache.swift": "b6c32783507022fd6b8ac0823e67a2cac4006c6490f198593beee4f4710f409b",
+      "Sources/DerivedKeysUI/SizeDependencies.swift": "69099e2298fdf3ac38d21a7767da0b1db81fd3ea99402d945da6d0aa366a074e",
+      "Sources/DerivedKeysUIKit/FittingDimension.swift": "a04db3892b21df7595ce74d59f97411fd864cd826ea3427477399d9ba1d4ed62",
+      "Sources/DerivedKeysUIKit/FittingProposal.swift": "0f0ddae5a0e27877f466bc0306c3eecf62bc4a6028660e9bcff60d76e6601985",
+      "Sources/DerivedKeysUIKit/LayoutCache.swift": "163ade46e9a960ccfb200ead77b67731b2456bb394593ec1527bef0c22d4acad",
+      "Sources/DerivedKeysUIKit/LayoutInputs.swift": "be71c3580b4965653fed34393d915da7075201620ecd42ab46ff8cc03865c915",
+      "Sources/DerivedKeysBenchmarks/Benchmark.swift": "a31ea079bd6ed3128830f7cf7ff6a48bf68c02b94348be66da4474e62adc674f",
+      "Sources/DerivedKeysBenchmarks/SizeBenchmark.swift": "99a7ef75f018acb83b8772789064ef315ef3b36885b30431e32c00cc01618280"
+    },
+    "optimized": {
+      "Package.swift": "05abf6bfe6b76dba5876e1426ca4a0c84b2f3b08aac2d3fc94c5f2d0574da240",
+      "Benchmarks/run.sh": "1a206f08593e69d39f87f63fa62d6059318c81130f2ad7885832e5cf4015e25e",
+      "Sources/DerivedKeys/DependencySnapshot.swift": "47c151257139525773e94cb68065b94680c2b3c47fa32228492062b66e86d6df",
+      "Sources/DerivedKeys/DerivedKey.swift": "208daed14c014d04b66746bd44d244c70e7913912d98e2fe182abaafeb157513",
+      "Sources/DerivedKeys/KeyPair.swift": "145659ac9d45d192dd794afb19952f9cfdf5a2372748afdbb070ad607ede9cac",
+      "Sources/DerivedKeys/KeyProjection.swift": "42aa3d1690d59cb0f605345b8e5dd8f32d5e98a800f9dd909e7e0aeb0eb7f615",
+      "Sources/DerivedKeys/KeySource.swift": "a29a324f3fec4bf6f4cc61984bcb77a4e9ed01562463159579553dac0c5c6bf5",
+      "Sources/DerivedKeys/KeyValueProvider.swift": "103c87ab4a381e27684c476fcf7d8f7a9dbe0a4ed855fd00523d59273d54f096",
+      "Sources/DerivedKeys/MemoizationCache.swift": "b7ef51ab1dcd65924374b2cd903e1836751f191a147c77c6b889998ef90b49ad",
+      "Sources/DerivedKeys/OriginalKey.swift": "cde2a8f4724348294aeddedf87f828f7ae262a2647a10a31fe320c4d790de99f",
+      "Sources/DerivedKeys/RequestKey.swift": "1b31463f408f79de5306e998d79aa2b5ef1240e5ae3c8808c1e6bae4302439ac",
+      "Sources/DerivedKeysUI/SizeCache.swift": "b6c32783507022fd6b8ac0823e67a2cac4006c6490f198593beee4f4710f409b",
+      "Sources/DerivedKeysUI/SizeDependencies.swift": "69099e2298fdf3ac38d21a7767da0b1db81fd3ea99402d945da6d0aa366a074e",
+      "Sources/DerivedKeysUIKit/FittingDimension.swift": "a04db3892b21df7595ce74d59f97411fd864cd826ea3427477399d9ba1d4ed62",
+      "Sources/DerivedKeysUIKit/FittingProposal.swift": "0f0ddae5a0e27877f466bc0306c3eecf62bc4a6028660e9bcff60d76e6601985",
+      "Sources/DerivedKeysUIKit/LayoutCache.swift": "163ade46e9a960ccfb200ead77b67731b2456bb394593ec1527bef0c22d4acad",
+      "Sources/DerivedKeysUIKit/LayoutInputs.swift": "be71c3580b4965653fed34393d915da7075201620ecd42ab46ff8cc03865c915",
+      "Sources/DerivedKeysBenchmarks/Benchmark.swift": "a31ea079bd6ed3128830f7cf7ff6a48bf68c02b94348be66da4474e62adc674f",
+      "Sources/DerivedKeysBenchmarks/SizeBenchmark.swift": "99a7ef75f018acb83b8772789064ef315ef3b36885b30431e32c00cc01618280"
+    }
+  },
+  "binarySHA256": {
+    "baseline": "a37c69d31fe6db3f436316d4394ad2d0c7a247adaf91192d85b0f735aca2cdf5",
+    "optimized": "e6af4471011e26f7a8d402fdb448da007f2ab67beb4e711d8afd1a60d0ae78ac"
+  },
+  "environment": {
+    "hardware": "Apple M1 Max, MacBookPro18,2, 10 logical CPUs, 64 GiB",
+    "hostOS": "macOS 27.2 (26B123), arm64",
+    "compiler": "Apple Swift 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1), driver 1.168.6",
+    "configuration": "SwiftPM release, Swift 6 mode, tools 6.4, macOS 13 minimum"
+  },
+  "baseline": "Task-entry capture of 7adad7c311ab773fa234f4788badb345ea9ee91e with the existing README reorganization; only DependencySnapshot.swift and KeySource.swift differ among measured build inputs.",
+  "methodology": "Five separate-process trials per case and variant; baseline/optimized order alternates per trial. 1000 operations, 4096 bytes per payload, capacity 128. Warmup/setup outside timing; no concurrent build or benchmark jobs. No power or background-system-load control."
+}

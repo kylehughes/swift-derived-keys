@@ -42,6 +42,26 @@ class SimulatorValidationTests(unittest.TestCase):
         result = self.observe()
         self.assertEqual((result["caseCount"], result["argumentCount"], result["leafExecutionCount"]), (2, 2, 3))
 
+    def test_xctest_url_may_omit_empty_parentheses(self):
+        self.plain["nodeIdentifierURL"] = self.plain["nodeIdentifierURL"].removesuffix("()")
+        self.observe()
+        self.selection[0] = self.selection[0].removesuffix("()")
+        self.observe()
+
+    def test_xctest_url_still_requires_exact_target_suite_and_method(self):
+        original = self.plain["nodeIdentifierURL"]
+        for value in (original.replace("CoreTests", "WrongTests"), original.replace("Suite", "WrongSuite"),
+                      original.replace("plain()", "other"), original + "extra", original + "?args=1",
+                      original + "#fragment", original.replace("com.apple.xcode", "example.com")):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.plain["nodeIdentifierURL"] = value
+                self.observe()
+
+    def test_parameterized_url_does_not_omit_signature(self):
+        self.parameter["nodeIdentifierURL"] = self.parameter["nodeIdentifierURL"].replace("parameter(value:)", "parameter")
+        with self.assertRaises(ValueError):
+            self.observe()
+
     def test_empty_enumeration(self):
         self.enumeration["values"][0]["enabledTests"] = []
         with self.assertRaises(ValueError):

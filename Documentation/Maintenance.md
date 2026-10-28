@@ -17,6 +17,8 @@ python3 Scripts/docs.py --output .build/docc-site
 Benchmarks/run.sh
 ```
 
+The [UIKit performance runner](../Benchmarks/README.md) separately runs the existing XCTest benchmark fixture in Release with coverage disabled. Use `python3 Benchmarks/run-uikit.py` for an owned Simulator, or supply a connected physical-device destination and local signing team. `python3 Benchmarks/test-run-uikit.py` checks result parsing. Ordinary test runs execute the fixture's small correctness trace; timing trials are opt-in and do not use performance thresholds as unit-test assertions.
+
 The compiler script builds public-import controls under Swift 6 complete concurrency checking and warnings as errors. It also compiles the core, both UI support modules, and the UI example module, then real UIKit key-path and README fixtures, for an explicit iOS 16 simulator deployment target. SDK compilation establishes deployment compatibility, not runtime execution on iOS 16. The Simulator script discovers an installed runtime, observes every selected test, and removes only the device it creates.
 
 Precondition fixtures execute in isolated debug child processes. Each invalid case must terminate abnormally with its intended diagnostic; valid controls must complete. They are outside the package test targets. Keep both valid and rejected compiler controls and these trap fixtures synchronized with the public contract.

@@ -22,7 +22,7 @@ public struct DependencySnapshot: Hashable {
     /// ``KeySource`` snapshot. Values must preserve their equality and hashing
     /// through any mutable aliases; this initializer does not deep-copy them.
     public init<Value>(value: Value) where Value: Hashable {
-        self.init(node: .original(label: "", type: ObjectIdentifier(Value.self), value: AnyHashable(value)))
+        self.init(label: "", value: value)
     }
 
     /// Creates an ordered composition, preserving each child's boundary.
@@ -37,6 +37,16 @@ public struct DependencySnapshot: Hashable {
         guard depth <= Self.maximumDepth else {
             throw ConstructionError.maximumDepthExceeded
         }
+    }
+
+    init<Value>(label: String, value: Value) where Value: Hashable {
+        self.init(
+            node: .original(
+                label: label,
+                type: ObjectIdentifier(Value.self),
+                value: AnyHashable(ConcreteValue(value: value))
+            )
+        )
     }
 
     init(node: Node) {
@@ -59,6 +69,12 @@ extension DependencySnapshot {
 }
 
 extension DependencySnapshot {
+    // Erase the wrapper so AnyHashable preserves Value's concrete Hashable
+    // operations instead of applying collection element erasure or bridging.
+    private struct ConcreteValue<Value>: Hashable where Value: Hashable {
+        let value: Value
+    }
+
     indirect enum Node: Hashable {
         case original(label: String, type: ObjectIdentifier, value: AnyHashable)
         case derived(label: String, children: [DependencySnapshot])

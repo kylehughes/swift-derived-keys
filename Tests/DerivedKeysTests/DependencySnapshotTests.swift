@@ -2,6 +2,32 @@ import DerivedKeys
 import Testing
 
 struct DependencySnapshotTests {
+    private final class ValueOperations {
+        var equalityCalls = 0
+        var hashCalls = 0
+    }
+
+    private struct TrackedValue: Hashable {
+        let value: Int
+        let operations: ValueOperations
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.operations.equalityCalls += 1
+            return lhs.value == rhs.value
+        }
+
+        func hash(into hasher: inout Hasher) {
+            operations.hashCalls += 1
+            hasher.combine(value)
+        }
+    }
+
+    private struct ArrayProvider: KeyValueProvider {
+        func value(for input: [TrackedValue]) -> [TrackedValue] {
+            input
+        }
+    }
+
     private struct Collision: Hashable {
         let value: Int
 
@@ -47,6 +73,40 @@ struct DependencySnapshotTests {
         #expect(first != second)
         #expect(Set([first, second]).count == 2)
         #expect(try DependencySnapshot(children: [first]) != DependencySnapshot(children: [second]))
+    }
+
+    @Test func arraySnapshotsRetainConcreteEqualityAndHashing() {
+        let operations = ValueOperations()
+        let values = [1, 2, 3].map { TrackedValue(value: $0, operations: operations) }
+        let snapshot = DependencySnapshot(value: values)
+        let equivalentSnapshots = [
+            DependencySnapshot(value: values),
+            KeySource<Void>("", value: values).snapshot(for: ()),
+            KeySource<[TrackedValue]>("", provider: { $0 }).snapshot(for: values),
+            KeySource<[TrackedValue]>("", provider: ArrayProvider()).snapshot(for: values),
+        ]
+
+        for equivalent in equivalentSnapshots {
+            #expect(snapshot == equivalent)
+        }
+        // Array equality recognizes shared storage without comparing elements.
+        // Erasing each array element loses this concrete collection behavior.
+        #expect(operations.equalityCalls == 0)
+
+        let separateValues = values.map { TrackedValue(value: $0.value, operations: operations) }
+        let separateSnapshot = DependencySnapshot(value: separateValues)
+        #expect(snapshot == separateSnapshot)
+        #expect(operations.equalityCalls > 0)
+        #expect(snapshot.hashValue == separateSnapshot.hashValue)
+        #expect(operations.hashCalls > 0)
+    }
+
+    @Test func arraySnapshotsPreserveValuesOrderMultiplicityAndElementTypes() {
+        let arrays = [[Int](), [1], [2], [1, 2], [2, 1], [1, 1], [1, 2, 2]]
+        let snapshots = arrays.map { DependencySnapshot(value: $0) }
+        #expect(Set(snapshots).count == arrays.count)
+        #expect(DependencySnapshot(value: [Int(1)]) != DependencySnapshot(value: [Int8(1)]))
+        #expect(DependencySnapshot(value: [Int(1)]) != DependencySnapshot(value: [Double(1)]))
     }
 
     @Test func compositionsPreserveOrderMultiplicityNestingAndEmptyBoundaries() throws {

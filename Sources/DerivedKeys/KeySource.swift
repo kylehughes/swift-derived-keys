@@ -26,9 +26,7 @@ public struct KeySource<Input> {
         node = Node(
             label: label,
             kind: .original { _ in
-                DependencySnapshot(
-                    node: .original(label: label, type: ObjectIdentifier(Value.self), value: AnyHashable(value))
-                )
+                DependencySnapshot(label: label, value: value)
             },
             depth: 1
         )
@@ -42,13 +40,7 @@ public struct KeySource<Input> {
         node = Node(
             label: label,
             kind: .original { input in
-                DependencySnapshot(
-                    node: .original(
-                        label: label,
-                        type: ObjectIdentifier(Value.self),
-                        value: AnyHashable(provider(input))
-                    )
-                )
+                DependencySnapshot(label: label, value: provider(input))
             },
             depth: 1
         )
@@ -63,13 +55,7 @@ public struct KeySource<Input> {
         node = Node(
             label: label,
             kind: .original { input in
-                DependencySnapshot(
-                    node: .original(
-                        label: label,
-                        type: ObjectIdentifier(Provider.Value.self),
-                        value: AnyHashable(provider.value(for: input))
-                    )
-                )
+                DependencySnapshot(label: label, value: provider.value(for: input))
             },
             depth: 1
         )

@@ -284,8 +284,11 @@ Measure key work separately from the expensive computation being cached.
 - Bound cache entries and account for retained key data as well as results. Avoid retaining large parent objects through otherwise small projections.
 - Do not claim constant-time lookup overall: projection, hashing, and equality have costs proportional to the inspected data. Dictionary indexing and LRU bookkeeping should be expected amortized constant time apart from those costs.
 - Start with standard-library facilities. Add macros, custom storage, or specialized graph machinery only when a measured need justifies them.
+- Preserve each selected value's concrete hashing and equality through internal erasure, including collections. Direct snapshots and source-produced snapshots must use the same representation without requiring caller wrappers.
 
 Benchmark release builds for direct computation, cold misses, warm hits, changing relevant inputs, changing irrelevant inputs, large payloads, shared dependencies, and eviction. Report compiler, hardware, workload, key cost, computation count, allocations where measurable, and retained memory. Do not set an unsupported universal speedup target.
+
+Actual UIKit fitting is the primary sizing evidence: compare equivalent direct and cached `UILabel`, `UITextView`, and document child/parent measurements on the main actor. Preserve UIKit's own warm behavior, include shared results across view instances, parent-only changes, transformed widths, content/typography changes, and bounded mixed traces with observed hits, misses, and eviction. Separate measurement-only timing from configuration work, validate results outside timing, and report repeated-trial variability. Identify Simulator results separately from physical-device results. Retain synthetic key and storage measurements as secondary diagnostics; fewer measurement calls alone do not establish a performance benefit.
 
 **11. Acceptance criteria and deliverables**
 
