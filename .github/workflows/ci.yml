@@ -33,6 +33,9 @@ jobs:
     - name: Compiler contracts and warning policy
       run: python3 Scripts/check-concurrency.py --warnings-policy
       timeout-minutes: 15
+    - name: Size cache preconditions
+      run: python3 Scripts/check-preconditions.py
+      timeout-minutes: 15
     - name: Test selected cases
       run: python3 Scripts/check-tests.py
       timeout-minutes: 15

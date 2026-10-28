@@ -10,7 +10,7 @@ Define that narrower equivalence separately from the model's general-purpose equ
 
 Use ``RequestKey`` with a small `Hashable` struct for fixed schemas. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled typed composition. ``KeySource`` supports heterogeneous runtime graphs, while ``MemoizationCache`` demonstrates bounded synchronous reuse.
 
-For UIKit integration, the separate `DerivedKeysUIKit` product adds validated fitting proposals and a main-actor `LayoutCache` for caller-defined sizes and frames. The generic core remains standard-library-only and has no main-actor requirement.
+For the short sizing API, `DerivedKeysUI` binds key-path dependencies and a measurement recipe in a recursive `SizeCache`. The separate `DerivedKeysUIKit` product retains validated fitting proposals and a main-actor `LayoutCache` for caller-defined sizes and frames. The generic core remains standard-library-only and has no main-actor requirement.
 
 ## Topics
 

@@ -29,3 +29,9 @@ Typed structs avoid the erased graph's per-evaluation node dictionary and arrays
 ``MemoizationCache`` uses bounded LRU storage. Its capacity bounds entries rather than bytes, so account for retained key content and results. Standard-library copy-on-write can copy storage after a cache value is copied. A cache hit skips the calculation entirely, so side effects required on every request must occur outside it.
 
 Typed snapshots and caches transfer only when their components are `Sendable`. Erased snapshots and source recipes deliberately do not promise transfer safety. The generic module is nonisolated; a UI adapter captures and measures within the main actor.
+
+## Compose captured values directly
+
+``DependencySnapshot/init(value:)`` retains a full hashable value and its concrete type. ``DependencySnapshot/init(children:)`` composes already captured snapshots in order, with the same 64-node depth bound. These unlabeled forms use empty labels and equal equivalent empty-label source snapshots. They are useful when the caller already owns selection and isolation; the core adds no UI or global-actor dependency.
+
+The sizing facade in `DerivedKeysUI` captures main-actor key-path values into this representation. Its traversal evaluates each declared occurrence independently, including mapped bindings; that differs from `KeySource`'s request-local shared-node memoization. Both preserve complete values and structure.

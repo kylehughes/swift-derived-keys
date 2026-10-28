@@ -193,7 +193,23 @@ Vend a supported `DerivedKeysUIKit` library alongside the standard-library-only 
 
 Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
 
-The README's primary example is a custom `UIView` using manual frames. Cache one immutable result containing the fitted size and child frames, and reuse it from `sizeThatFits(_:)` and `layoutSubviews()` using the same effective width-only proposal. Show parent measurement/frame assignment and content-driven layout scheduling. Keep the demonstration implementation compiled and tested. Typography and direction may be fixed for this introductory example if documented.
+The README's primary example uses `DerivedKeysUI.SizeCache` to cache an individual measurement and compose text/button/parent sizes. Its application `DocumentContentView` performs frame-based layout using the same child handles. Keep the explicit-input, complete-frame `LayoutCache` example as an advanced alternative.
+
+**8a. Key-path size recipes**
+
+Add a `DerivedKeysUI` production product without removing existing products. `SizeCache<Root>` is a main-actor reference facade whose initializer binds inferred heterogeneous hashable key paths, optional ordered child descriptions, explicit local capacity, and one synchronous measurement closure. Ordinary lookup is `size(of:toFit:)`. Root needs neither Hashable nor Sendable. Zero selected properties and zero children are valid. No user strings, erased wrappers, custom input structs, operation enums, macros, or builders are required.
+
+Same-root children pass directly; `child.at(keyPath)` maps a nonoptional nested root. Mixed mappings and multiple paths to one child must capture each binding independently. Descriptions are immutable and closed to outside construction. Child edges retain dependency readers, not result storage or measurement recipes; calculation closures retain the handles they call. Composition remains acyclic, with a checked maximum of 64 snapshot nodes per path, including selected value leaves.
+
+Keys contain full type-preserving dependency values and ordered recursive structure, the cache's own measurement scope, and both effective proposal dimensions. Snapshot selection never measures, consults result storage, or substitutes child sizes. Every declared child participates even when hidden. Parents select all variable inputs to proposal transformations, branches, and combination; transforms remain solely in calculations, and each invoked child keys its actual proposal.
+
+Proposals are nonthrowing validated boundaries: finite nonnegative axes including greatest finite magnitude, normalized signed zero, no silent rounding, and the identical normalized proposal sent to measurement. Invalid axes, negative capacity, excessive depth, and same-cache measurement reentry fail descriptive preconditions. Existing generic throwing APIs retain their error behavior.
+
+Each facade uses the existing bounded LRU, with local count/capacity/removal/clearing and capacity-zero semantics. Parent hits skip their calculation and child result lookups; parent misses may reuse child entries. Child clearing or eviction does not alter semantic dependencies and therefore does not invalidate retained parent results. Clearing a parent clears only its entries. Do not share one mutating value cache across recursive recipes or hold overlapping accesses; guard same-cache reentry before storage access.
+
+Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership and owns UIKit scheduling and outer-frame assignment.
+
+Validate heterogeneous/nested/zero dependencies, selected/unselected changes, both dimensions and normalization, transformed child proposals, parent-only and child-only changes, parent hits skipping child recency, three levels, all binding forms, root release, recipe scope, collisions, bounded eviction, zero capacity, independent clearing, and existing generic semantics. Compile real UIKit key paths at iOS 16 with Swift 6.4, test diagnostics in isolated processes, and measure snapshot, warm parent, parent miss with warm children, cold composed, and equivalent direct costs using the existing benchmark harness.
 
 Keep example-specific text/font/button policies in a non-product example target. Built-in text measurement helpers and Auto Layout integration are outside the production adapter's scope. Retain the richer child-composition example below as a secondary demonstration.
 
@@ -303,7 +319,7 @@ Deliver:
 
 - A Swift package containing the generic key/source abstractions.
 - The bounded generic reference cache.
-- A supported `DerivedKeysUIKit` product and tested custom frame-layout view example, plus a secondary text/button composition example.
+- Supported `DerivedKeysUI` sizing and `DerivedKeysUIKit` explicit-layout products, with tested UIKit examples and recursive composition.
 - A runnable non-UI example.
 - API documentation covering equality, dependency completeness, evaluation timing, isolation, lifetimes, and complexity.
 - Automated tests and reproducible release benchmarks.

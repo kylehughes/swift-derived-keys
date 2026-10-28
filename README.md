@@ -5,215 +5,172 @@
 [![macOS minimum: 13+](https://img.shields.io/badge/macOS-13%2B-007AFF)](#compatibility)
 [![iOS minimum: 16+](https://img.shields.io/badge/iOS-16%2B-007AFF)](#compatibility)
 
-DerivedKeys caches calculations by the inputs that affect their results. A custom UIKit view can reuse its measured size and child frames when its content and fitting bounds are unchanged, including across different view instances. Model identity and general-purpose equality stay unchanged.
+DerivedKeys builds cache keys from the values a computation depends on. Its sizing API lets you cache a view's size by declaring the properties that affect layout, then compose child caches to cache an entire layout. The underlying keys and bounded memoization are general-purpose Swift APIs.
 
-The package separates dependency selection, immutable key snapshots, and a bounded LRU cache. Use concrete keys for fixed schemas, or compose live sources when the dependency graph is assembled at runtime. Equal keys must mean interchangeable results; the library cannot discover missing dependencies for you.
+Use `DerivedKeysUI` for sizing; see [installation](#install-and-import). Create caches once in a retained main-actor owner.
 
-## Cache a custom view's layout
+## Cache one measurement
 
-Add the `DerivedKeysUIKit` product for this example. `LabelView` uses manual frames and retains a bounded cache for its lifetime. Both `sizeThatFits(_:)` and `layoutSubviews()` request the same layout: the supplied width and the text's natural height. The cached result contains the complete size and label frame.
+`DocumentContentView` below is an application type. Its `content` is a stable `Hashable` value—in the [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift), a `String`. `isExpanded` controls the line limit. The example fixes typography rules and the button title, and explicitly selects Dynamic Type. Additional variable measurement inputs need additional dependencies.
 
 ```swift
-import DerivedKeysUIKit
+import DerivedKeysUI
 import UIKit
 
+let textSizes = SizeCache<DocumentContentView>(
+    dependingOn: \.content,
+    \.isExpanded,
+    \.traitCollection.preferredContentSizeCategory,
+    capacity: 256
+) { view, proposal in
+    view.textView.sizeThatFits(proposal)
+}
+
+let size = textSizes.size(of: view, toFit: availableSize)
+```
+
+The initializer binds the selected properties and measurement recipe. A lookup reads their current values and automatically includes **both fitting dimensions** in the key. It returns a retained result when that complete request matches. The root view is not part of the key, so different views can reuse a result through the same cache. Neither the view nor its properties need to be `Sendable`; selected values must be `Hashable` and stable.
+
+## Compose a layout
+
+Add a button measurement, then declare both children when constructing the parent:
+
+```swift
+let buttonSizes = SizeCache<DocumentContentView>(
+    dependingOn: \.traitCollection.preferredContentSizeCategory,
+    capacity: 256
+) { view, proposal in
+    view.button.sizeThatFits(proposal)
+}
+
+let contentSizes = SizeCache<DocumentContentView>(
+    dependingOn: \.padding,
+    \.spacing,
+    \.showsButton,
+    children: textSizes, buttonSizes,
+    capacity: 256
+) { view, proposal in
+    let innerProposal = CGSize(
+        width: max(0, proposal.width - 2 * view.padding),
+        height: CGFloat.greatestFiniteMagnitude
+    )
+    let text = textSizes.size(of: view, toFit: innerProposal)
+    let button = view.showsButton
+        ? buttonSizes.size(of: view, toFit: innerProposal)
+        : .zero
+    return CGSize(
+        width: proposal.width,
+        height: 2 * view.padding + text.height + button.height
+            + (view.showsButton ? view.spacing : 0)
+    )
+}
+
+let initial = contentSizes.size(of: view, toFit: availableSize)
+view.spacing += 4
+let spaced = contentSizes.size(of: view, toFit: availableSize) // Parent miss; children hit.
+view.content += " Another paragraph."
+let edited = contentSizes.size(of: view, toFit: availableSize) // Parent and text miss; button hits.
+```
+
+The calculation captures the same child handles declared in `children:`. A parent hit skips its calculation and all child result lookups. A parent miss executes the calculation, whose child lookups can independently hit. Parents capture recursive dependency values even when child result storage is empty; cached sizes and child eviction state never become dependency identity.
+
+Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example intentionally computes natural height from the outer width. Every declared child participates in the parent snapshot, including a hidden button, so unused-child changes may conservatively cause a parent miss.
+
+Parents can themselves be children, and caches with no explicit properties can depend entirely on children:
+
+```swift
+let outerSizes = SizeCache<DocumentContentView>(
+    children: contentSizes,
+    capacity: 256
+) { view, proposal in
+    contentSizes.size(of: view, toFit: proposal)
+}
+```
+
+For children with different root types, use `at(_:)` with a key path to the child's root, as shown in the [mapping example](Examples/Size-Caches.md#map-a-child-root). This maps a dependency description, without creating a cache or copying entries. The calculation calls each original cache with that same mapped root. Same-root and mapped children can be mixed, and one child can be mapped to two distinct paths.
+
+## Choose ownership
+
+Composition does not dictate ownership. A screen-owned bundle is a useful default when reusable views should share results. The example's application-owned `DocumentSizeCaches` constructs the two children once, constructs the parent using those same handles, and retains all three. Parent closures capture child handles rather than the bundle or a view.
+
+```swift
 @MainActor
-final class LabelView: UIView {
-    enum Operation {}
-    struct Context: Hashable {}
-    struct Layout {
-        let size: CGSize
-        let labelFrame: CGRect
+final class DocumentScreen: UIViewController {
+    let sizeCaches = DocumentSizeCaches()
+    private lazy var contentView = DocumentContentView(caches: sizeCaches)
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.addSubview(contentView)
     }
 
-    private let cache = LayoutCache<Operation, String, Context, Layout>(capacity: 32)
-    private let label = UILabel()
-
-    var text: String {
-        didSet {
-            label.text = text
-            setNeedsLayout()
-        }
-    }
-
-    init(text: String) {
-        self.text = text
-        super.init(frame: .zero)
-        Self.configure(label, text: text)
-        addSubview(label)
-    }
-
-    required init?(coder: NSCoder) {
-        text = ""
-        super.init(coder: coder)
-        Self.configure(label, text: text)
-        addSubview(label)
-    }
-
-    override func sizeThatFits(_ size: CGSize) -> CGSize {
-        layout(forWidth: size.width)?.size ?? .zero
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        label.frame = layout(forWidth: bounds.width)?.labelFrame
-            .offsetBy(dx: bounds.minX, dy: bounds.minY) ?? .zero
-    }
-
-    private func layout(forWidth width: CGFloat) -> Layout? {
-        guard let proposal = try? FittingProposal(
-            fitting: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        ) else { return nil }
-
-        return cache.value(for: text, proposal: proposal, context: Context()) { text, proposal, _ in
-            let padding: CGFloat = 12
-            let width = proposal.fittingSize.width
-            let unbounded = proposal.width.limit == nil
-            let innerWidth = unbounded ? width : max(0, width - padding * 2)
-            let measuringLabel = UILabel()
-            Self.configure(measuringLabel, text: text)
-            let measured = innerWidth > 0
-                ? measuringLabel.sizeThatFits(CGSize(width: innerWidth, height: CGFloat.greatestFiniteMagnitude))
-                : .zero
-            let height = ceil(measured.height)
-            let outerWidth = unbounded ? ceil(measured.width) + padding * 2 : width
-            return Layout(
-                size: CGSize(width: outerWidth, height: height + padding * 2),
-                labelFrame: CGRect(
-                    x: min(padding, outerWidth / 2), y: padding,
-                    width: max(0, outerWidth - padding * 2), height: height
-                )
-            )
-        }
-    }
-
-    private static func configure(_ label: UILabel, text: String) {
-        label.text = text
-        label.font = .systemFont(ofSize: 17)
-        label.numberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.textAlignment = .left
-        label.semanticContentAttribute = .forceLeftToRight
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let available = view.bounds.inset(by: view.safeAreaInsets)
+        let size = contentView.sizeThatFits(CGSize(
+            width: max(0, available.width), height: CGFloat.greatestFiniteMagnitude
+        ))
+        contentView.frame = CGRect(origin: available.origin, size: size)
     }
 }
 ```
 
-The parent measures the view and assigns its frame on the main actor:
+Inside `DocumentContentView`, `sizeThatFits(_:)` calls `caches.contentSizes.size(of: self, toFit: size)`. Its `layoutSubviews()` calls the retained child handles with the same inner proposal and assigns frames. The [complete bundle and view](Sources/DerivedKeysUIExample/DocumentContentView.swift) are compiled and tested together; they are application examples, not required base classes. The controls synchronize rendered text, line limits, and category-only fonts from the declared values before direct measurement.
 
-```swift
-let view = LabelView(text: "A paragraph whose height depends on its available width.")
-let size = view.sizeThatFits(CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
-view.frame = CGRect(origin: CGPoint(x: 20, y: 20), size: size)
-view.layoutIfNeeded() // Reuses the layout calculated by sizeThatFits.
-```
+A view can instead own its own cache. An application can use a static cache when application-wide sharing is intentional. Separate instances own independent recipes and entries; assigning a cache reference shares its storage and recency. Keep configuration captured by a recipe fixed for its lifetime or select it as a dependency.
 
-Changing the text or width produces a different key. Repeated fitting and layout reuse the retained result. Paint-only changes can leave the key unchanged. The miss calculation configures a fresh label from the captured text, so it measures the same inputs used to form the key.
+## Install and import
 
-This example fixes typography, wrapping, direction, and padding, so its context is empty. It ignores proposed height, rounds height to whole points, and fills a finite proposed width. Widths smaller than the padding yield a zero-width label; invalid widths return zero. The greatest-finite-magnitude sentinel requests natural width. These are the view's policies: the cache itself neither rounds nor clamps results. If your layout reads fonts, traits, insets, or other state, capture those values in its inputs or context.
-
-The [tested implementation](Sources/DerivedKeysUIExample/LabelView.swift) also supports injecting a shared cache. The [UIKit guide](Examples/UI-Measurement.md) covers fitting, sharing, and composing child keys. A small view with a single remembered size may need only its own request struct and stored result; DerivedKeys adds complete request composition and bounded reuse across multiple inputs.
-
-## Installation
-
-Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies and select `DerivedKeysUIKit` for view layout caching or `DerivedKeys` for the generic key and cache APIs. Repository access is required. The development reference is `main`:
+Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies. Repository access is required. Use the development reference `main`:
 
 ```swift
 .package(url: "https://github.com/kylehughes/swift-derived-keys", branch: "main")
 ```
 
-Then add `.product(name: "DerivedKeysUIKit", package: "swift-derived-keys")` to your target's dependencies. Add the `DerivedKeys` product too when importing its lower-level APIs directly. The core uses only the Swift standard library; `DerivedKeysUIKit` adds fitting proposals and main-actor layout caching. Demonstration views remain example source, separate from the supported library products.
+For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-derived-keys")` to your target and `import DerivedKeysUI` alongside UIKit. Existing products remain available:
 
-## Selecting dependencies
+| Product | Use |
+| --- | --- |
+| `DerivedKeysUI` | Key-path size recipes, typed child mappings, and recursive size caching. |
+| `DerivedKeysUIKit` | Explicit fitting proposals and `LayoutCache` for caller-defined complete layout results such as sizes plus frames. |
+| `DerivedKeys` | General-purpose keys, projections, snapshots, sources, and value-semantic memoization. |
 
-### Fixed schemas and explicit snapshots
+### Compatibility
 
-Use a small `Hashable` value struct for the inputs of one operation. `RequestKey<Operation, Dependencies, Context>` adds a nominal operation type, algorithm version, and environment. Declare a separate operation enum for unrelated calculations, including when storing requests in an `AnyHashable` dictionary. A free-form label does not separate operations.
+Requires Swift tools 6.4, Swift 6 language mode, and iOS 16.0+ or macOS 13.0+. Strict concurrency checking and warnings as errors apply to owned Swift targets. `SizeCache` reads and measures synchronously on the main actor. Its geometry support also builds on macOS; UIKit examples and tests are conditional on UIKit availability. The generic core uses only the Swift standard library and has no global-actor requirement. No macros or property wrappers are required.
 
-`OriginalKey` labels one captured value. `DerivedKey` labels a composition, and `KeyPair` holds two heterogeneous children without type erasure. Domain structs make larger fixed schemas readable. `KeyProjection` stores a reusable synchronous function from explicit input to dependencies:
+## Use the cache correctly
 
-```swift
-import DerivedKeys
+Select every variable input that affects measurement, proposal transformation, branching, or combination. The API cannot discover undeclared closure captures. Key-path reads and measurement must see consistent state during the synchronous request, and dependency getters must not mutate result-relevant state or recursively evaluate caches. Changing a model does not automatically schedule layout or refit its container.
 
-enum ExportOperation {}
-struct ExportInput: Hashable {
-    let text: String
-    let uppercase: Bool
-}
+`Hashable` does not make a mutable reference a snapshot. Select immutable content, or expose a computed property that projects an immutable value and select that property by key path. The core's projection APIs are another escape hatch. Object identity or a document ID alone does not describe changing content. Keys retain complete values, concrete value types, and ordered child structure, so hash collisions do not substitute for equality.
 
-let projection = KeyProjection(operation: ExportOperation.self) { (input: ExportInput) in
-    DerivedKey("export", children: input)
-}
-let input = ExportInput(text: "Hello", uppercase: true)
-let key = projection.key(for: input, context: "plain-text")
-```
+Both proposed dimensions must be finite and nonnegative. NaN, infinity, and negatives fail descriptive preconditions. `CGFloat.greatestFiniteMagnitude` is supported as the unbounded sentinel. Signed zero is normalized, and the calculation receives the same normalized proposal represented by the key; dimensions are not silently rounded. The facade leaves result sizing, rounding, and clamping to the recipe.
 
-Keep every value's equality and hashing stable for the lifetime of a key. `Hashable` does not ensure immutability: copying a mutable class reference is not a snapshot. Project its content into immutable values instead. A content ID alone cannot describe edits under that ID; a revision is sufficient only with complete mutation coverage, a unique content identity, and a non-reuse contract.
+Dependency composition is immutable and acyclic by construction. The checked limit is 64 snapshot nodes per path: an empty description has depth one, a description with a selected value has depth two, and each parent adds a level. Mapping adds no level. Excess depth fails a precondition. Each declared occurrence is read independently, including repeated mappings, so separate root bindings cannot accidentally share a traversal snapshot. Reentering the same cache during its measurement, including count inspection or clearing, fails a precondition; recursion through distinct child caches is supported.
 
-### Runtime composition and live reads
+### Storage, lifetime, and clearing
 
-`KeySource<Input>` is an immutable graph recipe. Providers run when `snapshot(for:)` is called. Sources are deliberately not dictionary keys; `DependencySnapshot` is the evaluated key material.
+`capacity` limits entries in each cache; zero disables storage. Successful lookups update LRU recency, and full caches evict their least recently used entry. Use `count`, `removeSize(of:toFit:)`, and `removeAll()` to inspect or clear local results. Removal selects the root's current dependencies and proposal.
 
-```swift
-let text = KeySource<ExportInput>("text") { $0.text }
-let options = KeySource<ExportInput>("uppercase") { $0.uppercase }
-let source = try KeySource("export", children: [text, options])
-let input = ExportInput(text: "Hello", uppercase: true)
-let key = RequestKey(
-    operation: ExportOperation.self,
-    dependencies: source.snapshot(for: input),
-    context: "plain-text"
-)
-```
+Clearing a parent leaves its children intact. Clearing or evicting a child leaves otherwise valid parent results intact. Previous input states can reuse retained entries when they return. If an undeclared external change requires clearing, clear **every affected result cache**, or represent that change as a dependency. There is no recursive clearing or shared eviction budget.
 
-The closure convenience requires `@Sendable`, so an actor-isolated closure cannot be silently stored as a nonisolated callback. Inputs and returned `Hashable` values need not be `Sendable`. For live non-Sendable state, conform a reader to `KeyValueProvider` and pass it as `provider:`. Its `nonisolated value(for:)` method makes the execution contract explicit without making the reader transferable. `KeyProjection` also accepts this reader form. Keep that state within its mutation owner.
+Entries retain snapshots and results, not lookup roots implicitly. The facade retains its configured measurement closure; user captures and reference-valued dependencies can retain objects. Child descriptions retain dependency-reading recipes, not child result storage. Keep the child handles needed by a calculation in that calculation's captures. Side effects that must run on every request belong outside the cached recipe.
 
-Providers must be synchronous, side-effect-free reads: no I/O, mutation, suspension, or recursive evaluation. Actor-isolated properties belong in an explicit snapshot captured by the actor before calling the source. Sources retain their providers, so avoid owner/source capture cycles; evaluated keys and cache entries do not retain those providers. A weak-owner adapter should represent a missing owner explicitly, never fabricate a valid dependency value.
+## Use the generic core
 
-Each distinct source is read once per evaluation, even when shared by several parents. That memoization does not synchronize different properties or sources. Capture related state together, then calculate from the same snapshot without an intervening mutation. No change notification or `update()` call is needed. When values return A → B → A, the original key is restored.
+The same dependency and memoization concepts work without UI. The [document exporter](Examples/Document-Export.md) selects content and export options while ignoring selection and scrolling; run it with `swift run DocumentExportExample`.
 
-Composition preserves labels, original versus derived nodes, concrete value types, order, multiplicity, optional presence, and nested boundaries. Empty derived compositions are valid. `appending` returns a new derived source; rebinding a child variable does not change an existing composition. Build large collections with `init(_:children:)`: repeated appends copy the child array. Graph depth is limited to 64 nodes per path; construction throws beyond that bound. Immutable edges prevent graph cycles.
+Use the [generic API guide](Examples/Generic-Core.md) for typed keys, `KeyProjection`, `KeySource`, and `MemoizationCache`. `DependencySnapshot(value:)` and `DependencySnapshot(children:)` also support direct heterogeneous value composition outside UI. The original throwing construction and computation APIs, optional-value hits, and independent value copies remain available.
 
-Arrays preserve order. For unordered inputs, use a `Set`, a dictionary with its own order-independent `Hashable` semantics, or canonicalize according to the calculation. Do not turn incidental dictionary iteration order into an ordered dependency list.
+For a small view with one remembered size, an ordinary request struct and stored result may suffice. These APIs provide declared dependency composition and bounded reuse across several input states. Caching still pays for snapshot selection, hashing, and equality; it is not universally faster than direct measurement.
 
-## Cache behavior and ownership
+## Further documentation
 
-`MemoizationCache<Key, Value>` requires an explicit nonnegative capacity. Zero disables storage. Hits and successful insertions become most recently used; overflow evicts the least recently used entry. A hit skips the calculation. A thrown calculation propagates its error without insertion or eviction; a cached optional `nil` is a hit. Use `removeValue(for:)`, `removeAll()`, and `count` to manage storage.
-
-The cache is a value type with exclusive mutation. Copies evolve independently, with standard-library copy-on-write costs on later mutation. Reentering the same cache during its calculation is unsupported; separate caches can be composed. Results, like keys, must not change meaning through mutable external aliases. Computations whose side effects must run on every call do not belong in this cache.
-
-Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement. `DerivedKeysUIKit.LayoutCache` is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities.
-
-Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. Use reusable immutable projections at controlled content-mutation boundaries when profiling warrants it. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
-
-## Examples and documentation
-
-The [UIKit guide](Examples/UI-Measurement.md) covers complete layout caching, shared ownership, and request composition. The [text/button example](Examples/Text-Component.md) shows independently cached child measurements. For a non-UI use, read the [document exporter](Examples/Document-Export.md) or run `swift run DocumentExportExample`; it uses ordered paragraphs, format, and export options while ignoring selection and scrolling.
-
-The [UIKit API overview](Documentation/DerivedKeysUIKit.docc/DerivedKeysUIKit.md) covers fitting and cache contracts. The [core overview](Documentation/DerivedKeys.docc/DerivedKeys.md) links the key APIs and [dependency design guide](Documentation/DerivedKeys.docc/DependencyDesign.md). [Release benchmarks](Benchmarks/README.md) separate key work from computation, explain workloads, and report memory-measurement limits.
-
-## Compatibility
-
-The package declares Swift tools 6.4, Swift 6 language mode, macOS 13.0+, and iOS 16.0+. Default actor isolation is nonisolated; Swift 6 strict concurrency checking applies. Every owned Swift target treats compiler warnings as errors. `DerivedKeys` uses only the Swift standard library. `DerivedKeysUIKit` uses CoreGraphics for fitting geometry; its proposals and cache also compile on macOS. The example views and UIKit measurement tests exist only where UIKit is available.
-
-## Maintenance
-
-From the repository root with Xcode 27.1 selected and Python 3 installed:
-
-```sh
-swift build
-swift test --enable-code-coverage
-swift build -c release
-python3 Scripts/check-tests.py --configuration release
-python3 Scripts/check-concurrency.py --warnings-policy
-python3 Scripts/test-check-simulator.py
-python3 Scripts/check-simulator.py
-swift format lint --strict --recursive Package.swift Sources Tests
-python3 Scripts/docs.py --output .build/docc-site
-```
-
-Choose a fresh output directory for each DocC build. The static site's entry is `/swift-derived-keys/documentation/`, with module pages at `derivedkeys/` and `derivedkeysuikit/` beneath it; serve the output beneath `/swift-derived-keys/` to test deep links. The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) build/test the package, prepare static documentation, and provide a manual release operation. Documentation deployment requires explicitly selecting `deploy` on a manual run and configuring Pages access appropriate to the repository. A documentation build alone does not deploy it.
-
-The manual release workflow requires a version, exact candidate commit, and supplied notes unless generated notes are explicitly selected. It verifies the candidate before a separate publisher creates release artifacts. Deployment, tags, releases, and repository visibility changes require their own authorization. Keep README examples, API comments, compiler fixtures, and compatibility settings synchronized when changing the public contract.
+- [Sizing and mapped children](Examples/Size-Caches.md), including the complete ownership example.
+- [SizeCache API](Documentation/DerivedKeysUI.docc/DerivedKeysUI.md), [explicit layout results](Examples/UI-Measurement.md), and [core dependency design](Documentation/DerivedKeys.docc/DependencyDesign.md).
+- [Release benchmarks](Benchmarks/README.md), with workloads, measured results, and allocation limits.
+- [Tests and maintenance](Documentation/Maintenance.md), including explicit iOS 16 compiler checks, precondition probes, and Simulator execution.
 
 ## Contributions
 

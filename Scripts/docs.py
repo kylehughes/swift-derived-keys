@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 
-MODULES = ['DerivedKeys', 'DerivedKeysUIKit']
+MODULES = ['DerivedKeys', 'DerivedKeysUI', 'DerivedKeysUIKit']
 BASE_PATH = 'swift-derived-keys'
 
 

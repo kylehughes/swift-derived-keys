@@ -8,8 +8,18 @@ struct DerivedKeysBenchmarks {
     private typealias Projection = KeyProjection<Operation, Input, Dependencies>
     private typealias TypedKey = RequestKey<Operation, Dependencies, Int>
 
+    @MainActor
     static func main() throws {
         let options = try Options(arguments: Array(CommandLine.arguments.dropFirst()))
+        if options.scenario.rawValue.hasPrefix("size-") {
+            try SizeBenchmarks.run(
+                scenario: options.scenario.rawValue,
+                iterations: options.iterations,
+                payloadBytes: options.payloadBytes,
+                capacity: options.capacity
+            )
+            return
+        }
         let payloadSize = options.scenario == .largePayload ? max(options.payloadBytes, 262_144) : options.payloadBytes
         let payload = (0 ..< payloadSize)
             .map {
@@ -383,6 +393,11 @@ extension DerivedKeysBenchmarks {
 
 extension DerivedKeysBenchmarks {
     private enum Scenario: String {
+        case sizeSnapshot = "size-snapshot"
+        case sizeWarmParent = "size-warm-parent"
+        case sizeParentMiss = "size-parent-miss"
+        case sizeCold = "size-cold"
+        case sizeDirect = "size-direct"
         case typedProjection = "typed-projection"
         case typedHash = "typed-hash"
         case direct

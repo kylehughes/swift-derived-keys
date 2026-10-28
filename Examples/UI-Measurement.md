@@ -1,6 +1,6 @@
 # Caching a custom UIKit layout
 
-Add the `DerivedKeysUIKit` product to your app target and import it alongside UIKit. The [README](../README.md#cache-a-custom-views-layout) shows a complete frame-based `UIView`. Its [compiled example](../Sources/DerivedKeysUIExample/LabelView.swift) caches a `Layout` containing an overall size and a label frame. The example target is not a package product; copy and adapt the view in your app.
+Add the `DerivedKeysUIKit` product to your app target and import it alongside UIKit. For the shorter key-path sizing API, start with [SizeCache](Size-Caches.md). This guide covers the explicit-input API for complete layout results. Its [compiled example](../Sources/DerivedKeysUIExample/LabelView.swift) caches a `Layout` containing an overall size and a label frame. The example target is not a package product; copy and adapt the view in your app.
 
 ## Capture one request
 

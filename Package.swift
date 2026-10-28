@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "DerivedKeys", targets: ["DerivedKeys"]),
         .library(name: "DerivedKeysUIKit", targets: ["DerivedKeysUIKit"]),
+        .library(name: "DerivedKeysUI", targets: ["DerivedKeysUI"]),
         .executable(name: "DocumentExportExample", targets: ["DocumentExportExample"]),
         .executable(name: "DerivedKeysBenchmarks", targets: ["DerivedKeysBenchmarks"]),
     ],
@@ -18,8 +19,13 @@ let package = Package(
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .target(
-            name: "DerivedKeysUIExample",
+            name: "DerivedKeysUI",
             dependencies: ["DerivedKeys", "DerivedKeysUIKit"],
+            swiftSettings: [.treatAllWarnings(as: .error)]
+        ),
+        .target(
+            name: "DerivedKeysUIExample",
+            dependencies: ["DerivedKeys", "DerivedKeysUIKit", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .executableTarget(
@@ -29,7 +35,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "DerivedKeysBenchmarks",
-            dependencies: ["DerivedKeys"],
+            dependencies: ["DerivedKeys", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .testTarget(
@@ -43,8 +49,13 @@ let package = Package(
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .testTarget(
+            name: "DerivedKeysUITests",
+            dependencies: ["DerivedKeys", "DerivedKeysUI"],
+            swiftSettings: [.treatAllWarnings(as: .error)]
+        ),
+        .testTarget(
             name: "DerivedKeysUIExampleTests",
-            dependencies: ["DerivedKeysUIExample", "DerivedKeysUIKit"],
+            dependencies: ["DerivedKeysUIExample", "DerivedKeysUIKit", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
     ],

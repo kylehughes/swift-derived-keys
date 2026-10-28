@@ -1,6 +1,6 @@
 # Derived Keys benchmarks
 
-These release benchmarks measure the work involved in forming keys and reusing a synthetic calculation. Use them to inspect a workload on a particular compiler and machine; the results do not establish a universal speedup. A [recorded release sample](Results.md) includes timings, computation counts, and memory limits from one machine.
+These release benchmarks measure the work involved in forming keys and reusing a synthetic calculation. Use them to inspect a workload on a particular compiler and machine; the results do not establish a universal speedup. The [generic release sample](Results.md) and [size-facade release sample](Size-Results.md) record timings, computation counts, and memory limits from one machine.
 
 ## Run the suite
 
@@ -18,9 +18,9 @@ Use the same arguments for comparisons:
 Benchmarks/run.sh --iterations 5000 --payload-bytes 8192 --capacity 128
 ```
 
-Defaults are 1,000 measured operations, a 4,096-byte payload, and a capacity of 128 entries. The large-payload case uses at least 262,144 bytes. Arguments must be positive integers; iteration and capacity limits are 1,000,000, and the payload limit is 16,777,216 bytes. To choose the output directory, set `BENCHMARK_OUTPUT_DIR` to a new directory for each run. Keep generated results outside the repository when comparing candidates.
+Defaults are 1,000 measured operations, a 4,096-byte payload, and a capacity of 128 entries. The large-payload case uses at least 262,144 bytes. Arguments must be positive integers; iteration and capacity limits are 1,000,000, and the payload limit is 16,777,216 bytes. To choose the output directory, set `BENCHMARK_OUTPUT_DIR` to a new directory for each run. Keep generated results outside the repository when comparing candidates. Set `BENCHMARK_SCRATCH_PATH` to use an isolated SwiftPM build directory.
 
-For one case, run the built executable directly:
+For one case, run the executable through SwiftPM:
 
 ```sh
 swift run -c release DerivedKeysBenchmarks --case warm-hit --iterations 5000
@@ -51,13 +51,31 @@ The runtime graph is built before timing. Its left branch contains content and f
 
 Projection-only timings include the observation array's assignment and reference-counting costs. Hash-only timings include reading a preconstructed key and accumulating its hash. These rows identify separate sources of cost; subtracting their timings from an end-to-end row does not isolate an exact cache overhead.
 
+## Size-facade workload and cases
+
+The five `size-` cases exercise `DerivedKeysUI.SizeCache` synchronously on the main actor with plain Swift value roots. They do not measure UIKit text fitting. Two child caches select a byte payload, integer variant, and floating-point scale through heterogeneous key paths. The parent selects spacing and orientation, and maps both child descriptions through its nested roots. Child snapshots contribute to the parent key; the parent recipe explicitly requests child sizes on a parent miss.
+
+Each child calculation performs the same four passes of wrapping byte mixing as the generic calculation, then produces a bounded `CGSize` using its scale and a fixed 320-by-240 proposal. The parent combines both sizes with spacing. Both children share one payload buffer; each uses a different integer variant. Input assembly occurs inside the measured loops. Payload generation, graph construction, observation-array allocation, and warmup occur before timing.
+
+| Case | Timed work | Expected measured calculations: parent / left / right |
+| --- | --- | --- |
+| `size-snapshot` | Capture the composed snapshot into a preallocated 64-slot array while changing both child variants. Hash the retained snapshots after timing. | 0 / 0 / 0 |
+| `size-warm-parent` | Repeatedly request one complete parent key warmed before timing. Each request still captures and hashes its dependencies. | 0 / 0 / 0 |
+| `size-parent-miss` | Warm both children, then change only parent spacing each iteration. Child inputs and their effective proposals stay equal. | iterations / 0 / 0 |
+| `size-cold` | Change both child variants each iteration, capturing, looking up, measuring, and inserting at every level. | iterations / iterations / iterations |
+| `size-direct` | Assemble the same inputs as `size-cold` and perform the same child and parent math directly. No snapshots or cache lookups occur inside timing. | iterations / iterations / iterations |
+
+All three caches use the requested capacity. `size-cold` and `size-parent-miss` evict after filling when iterations exceed capacity; their names do not imply unbounded storage. Use capacity at least equal to iterations for a comparison without those evictions. The direct and snapshot cases construct the same graph before timing but leave result storage empty.
+
+Every returned size contributes to a printed integer checksum. After timing, each result-producing case checks that checksum against direct calculation over the same inputs. The cold and direct cases must therefore produce the same checksum. These validation calculations are outside the timed loop. Runtime preconditions also check the individual parent and child calculation counts. Snapshot checksums use process-local hashes and can differ between processes.
+
 ## Read the output
 
-`elapsedNanoseconds` covers the named loop; `nanosecondsPerOperation` divides it by `iterations`. Input construction, cache warmup, graph construction, observation-array allocation, and JSON encoding are outside the named loops. The shared-source process has three consecutive loops, each reported separately.
+`elapsedNanoseconds` covers the named loop; `nanosecondsPerOperation` divides it by `iterations`. Payload generation, cache warmup, graph construction, observation-array allocation, and JSON encoding are outside the named loops. Per-iteration input assembly remains inside timing. The shared-source process has three consecutive loops, each reported separately.
 
 `computationCount` counts calls inside the measured loop, and `warmupComputationCount` reports calculation calls before it. Expected hit and miss counts are checked at runtime. The calculation has an inline barrier, and every returned value contributes to the printed checksum. Projection-only keys are kept in the observation array and hashed after timing. Hash rows accumulate process-local Swift hashes, so their checksums can differ across processes. Checksums provide observable output, not stable identifiers or cryptographic verification.
 
-Memory fields describe the cache at the end of the loop:
+The generic cases retain their original JSON schema. Their memory fields describe the cache at the end of the loop:
 
 | Field | Meaning |
 | --- | --- |
@@ -69,6 +87,8 @@ Memory fields describe the cache at the end of the loop:
 
 These fields account for payload content and result values. They exclude array headers, spare allocation capacity, dictionaries, cache slots, labels, erased graph nodes, allocator overhead, and executable/runtime memory. The input also owns the shared payload, so its bytes are not exclusively attributable to the cache. The fields are not a heap census or an estimate of total retained key bytes.
 
-The `.time.txt` file records the whole process's high-water resident set size, including startup, setup, warmup, measurement, output, and temporary storage. For `shared-source`, that includes all three phases and its observation array. It cannot establish per-phase memory use, live cache retention after clearing, or bytes owned only by keys. Allocation counts remain unknown because the runner does not attach an allocation profiler; resource counters from `time` are not allocation counts.
+The size cases use a separate schema. Each `caches` entry names the parent, left child, or right child and reports `cacheCapacity`, `entryCount`, `computationCount`, and `warmupComputationCount`. `requestedCapacityPerCache` is the command-line capacity; `payloadBytesPerChild` is the payload length selected by each child. `storedResultValueBytesAcrossCaches` sums final entry counts multiplied by `MemoryLayout<CGSize>.stride`. It excludes snapshots, cache storage, closures, headers, and allocator overhead. Total retained key bytes and allocation counts are unknown.
+
+The `.time.txt` file records the whole process's high-water resident set size, including startup, setup, warmup, measurement, output, and temporary storage. For `shared-source`, that includes all three phases and its observation array. For size cases it also includes graph setup, snapshot-checksum hashing, and the direct validation pass outside timing. It cannot establish per-phase memory use, live cache retention after clearing, or bytes owned only by keys. Allocation counts remain unknown because the runner does not attach an allocation profiler; resource counters from `time` are not allocation counts.
 
 Keep the metadata and raw measurements with any published numbers. State the case, payload size, capacity, iterations, compiler, hardware, and sampling method. Use application-specific profiling before choosing a projection, revision scheme, or cache size.

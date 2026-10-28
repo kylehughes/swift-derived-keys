@@ -7,8 +7,12 @@ benchmark_output=${BENCHMARK_OUTPUT_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/derivedkey
 mkdir -p "$benchmark_output"
 benchmark_output=$(cd "$benchmark_output" && pwd)
 
-swift build -c release --product DerivedKeysBenchmarks
-benchmark_bin_dir=$(swift build -c release --show-bin-path)
+benchmark_build_options=()
+if [[ -n "${BENCHMARK_SCRATCH_PATH:-}" ]]; then
+    benchmark_build_options+=(--scratch-path "$BENCHMARK_SCRATCH_PATH")
+fi
+swift build -c release "${benchmark_build_options[@]}" --product DerivedKeysBenchmarks
+benchmark_bin_dir=$(swift build -c release "${benchmark_build_options[@]}" --show-bin-path)
 benchmark_binary="$benchmark_bin_dir/DerivedKeysBenchmarks"
 
 {
@@ -32,7 +36,8 @@ benchmark_binary="$benchmark_bin_dir/DerivedKeysBenchmarks"
         printf ' (defaults)'
     fi
     printf '\nSource SHA-256 digests:\n'
-    shasum -a 256 Package.swift Sources/DerivedKeys/*.swift Sources/DerivedKeysBenchmarks/*.swift
+    shasum -a 256 Package.swift Benchmarks/run.sh Sources/DerivedKeys/*.swift \
+        Sources/DerivedKeysUIKit/*.swift Sources/DerivedKeysUI/*.swift Sources/DerivedKeysBenchmarks/*.swift
     printf 'Allocation counts: unknown; no allocation profiler attached.\n'
     printf 'RSS: /usr/bin/time -l per case; whole-process high-water mark.\n'
 } > "$benchmark_output/metadata.txt"
@@ -41,7 +46,8 @@ printf 'Benchmark output: %s\n' "$benchmark_output"
 cat "$benchmark_output/metadata.txt"
 for benchmark_case in \
     typed-projection typed-hash direct cold-miss warm-hit \
-    relevant-change irrelevant-change large-payload shared-source eviction; do
+    relevant-change irrelevant-change large-payload shared-source eviction \
+    size-snapshot size-warm-parent size-parent-miss size-cold size-direct; do
     /usr/bin/time -l "$benchmark_binary" "$@" --case "$benchmark_case" \
         > "$benchmark_output/$benchmark_case.jsonl" \
         2> "$benchmark_output/$benchmark_case.time.txt"

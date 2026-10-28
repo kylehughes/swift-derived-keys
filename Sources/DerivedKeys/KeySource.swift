@@ -16,7 +16,7 @@ public struct KeySource<Input> {
     ///
     /// This bound protects recursive evaluation, equality, hashing, and teardown.
     public static var maximumDepth: Int {
-        64
+        DependencySnapshot.maximumDepth
     }
 
     private let node: Node
