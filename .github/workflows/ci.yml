@@ -1,0 +1,77 @@
+name: CI
+'on':
+  pull_request: {}
+  push: {}
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      timeout-minutes: 5
+      with:
+        persist-credentials: false
+    - name: Select and observe Swift 6.4
+      run: |-
+        sudo xcode-select -s /Applications/Xcode_27.1.app/Contents/Developer
+        swift --version | tee "$RUNNER_TEMP/swift-version.txt"
+        grep -E 'Swift version 6\.4([ .]|$)' "$RUNNER_TEMP/swift-version.txt"
+      timeout-minutes: 15
+      shell: bash
+    - name: Build
+      run: swift build
+      timeout-minutes: 15
+    - name: Release build
+      run: swift build --configuration release
+      timeout-minutes: 15
+    - name: Compiler contracts and warning policy
+      run: python3 Scripts/check-concurrency.py --warnings-policy
+      timeout-minutes: 15
+    - name: Test selected cases
+      run: python3 Scripts/check-tests.py
+      timeout-minutes: 15
+    - name: Simulator observation controls
+      run: python3 Scripts/test-check-simulator.py
+      timeout-minutes: 5
+    - name: iOS Simulator tests
+      run: python3 Scripts/check-simulator.py
+      timeout-minutes: 25
+    - name: Strict format
+      run: swift format lint --strict --recursive Package.swift Sources Tests
+      timeout-minutes: 15
+    - name: Static DocC
+      run: python3 Scripts/docs.py --output .build/site
+      timeout-minutes: 15
+  gate:
+    name: Required checks
+    if: ${{ always() }}
+    needs:
+    - checks
+    runs-on: xcode-27
+    timeout-minutes: 5
+    steps:
+    - name: Validate
+      shell: bash
+      timeout-minutes: 15
+      run: |
+        python3 -I - <<'PY'
+        import json
+        import os
+
+        expected = json.loads(os.environ["EXPECTED_JOBS"])
+        observed = json.loads(os.environ["JOB_RESULTS"])
+        if not expected or len(expected) != len(set(expected)) or set(observed) != set(expected):
+            raise SystemExit("Missing or unexpected required jobs")
+        if any(not isinstance(observed[name], dict) or observed[name].get("result") != "success" for name in expected):
+            raise SystemExit("Every required job must finish successfully")
+        print("All selected checks succeeded")
+        PY
+      env:
+        EXPECTED_JOBS: '["checks"]'
+        JOB_RESULTS: ${{ toJSON(needs) }}
