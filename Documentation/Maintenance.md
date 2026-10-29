@@ -37,4 +37,22 @@ The static site's entry is `/swift-derived-keys/documentation/`; its module page
 
 ## Hosted workflows
 
-The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run checks and prepare static documentation. Manual documentation deployment requires selecting `deploy` and configuring Pages access appropriate to the repository. Manual release verification requires a version, exact candidate commit, and supplied notes unless generated notes are explicitly selected. Deployment, tags, releases, and visibility changes require their own authorization. Keep examples, API comments, [the specification](../SPEC.md), and compiler fixtures aligned with the public API.
+The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run checks and build static documentation. Documentation deployment is disabled while the repository is private, including manual runs with `deploy` selected.
+
+### Publish documentation
+
+The Documentation workflow responds to GitHub's [`public` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#public) when this repository changes from private to public. After that change, it builds and deploys DocC automatically; subsequent pushes to `main` update the site. GitHub Pages must use **GitHub Actions** as its publishing source, and the `github-pages` environment must allow deployments from `main`.
+
+The deployment job consumes only its own run's `documentation-site` artifact. Before publishing, it checks the repository's current visibility, the configured Pages URL, and that the built commit is still the head of `main`. It does not change repository visibility. If an older run is superseded, use the current commit's run instead of publishing the old artifact.
+
+The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After the first public deployment, verify that entry, all three module pages, and their navigation and assets. A successful private build establishes artifact readiness; it cannot establish a live deployment.
+
+To rebuild and deploy the current public `main` manually:
+
+```sh
+gh workflow run documentation.yml --repo kylehughes/swift-derived-keys --ref main -f deploy=true
+```
+
+### Prepare a versioned release
+
+Manual release verification requires a version, exact candidate commit, and supplied notes unless generated notes are explicitly selected. Changing repository visibility does not create a version tag or release. Those operations require their own authorization. Keep examples, API comments, [the specification](../SPEC.md), and compiler fixtures aligned with the public API.

@@ -1,12 +1,13 @@
 name: Documentation
 'on':
+  public: {}
   push:
     branches:
     - main
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy documentation to an explicitly authorized Pages destination
+        description: Deploy documentation when the repository is public
         type: boolean
         default: false
 permissions:
@@ -39,18 +40,57 @@ jobs:
         name: documentation-site
         path: .build/site
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
+    if: >-
+      ${{ github.repository == 'kylehughes/swift-derived-keys'
+          && github.ref == 'refs/heads/main'
+          && github.event.repository.private == false
+          && github.event.repository.visibility == 'public'
+          && (github.event_name == 'public' || github.event_name == 'push'
+              || (github.event_name == 'workflow_dispatch' && inputs.deploy)) }}
     needs:
     - build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+    - name: Verify public destination and current candidate
+      shell: bash
+      timeout-minutes: 5
+      env:
+        GH_TOKEN: ${{ github.token }}
+        CANDIDATE: ${{ github.sha }}
+      run: |
+        gh api repos/kylehughes/swift-derived-keys > "$RUNNER_TEMP/pages-repository.json"
+        gh api repos/kylehughes/swift-derived-keys/pages > "$RUNNER_TEMP/pages-site.json"
+        gh api repos/kylehughes/swift-derived-keys/git/ref/heads/main > "$RUNNER_TEMP/pages-head.json"
+        python3 -I - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        temporary = Path(os.environ["RUNNER_TEMP"])
+        repository = json.loads((temporary / "pages-repository.json").read_text())
+        site = json.loads((temporary / "pages-site.json").read_text())
+        head = json.loads((temporary / "pages-head.json").read_text())
+        if (repository.get("full_name") != "kylehughes/swift-derived-keys"
+                or repository.get("private") is not False
+                or repository.get("visibility") != "public"
+                or repository.get("default_branch") != "main"):
+            raise SystemExit("Documentation deployment requires the public canonical repository")
+        if (site.get("build_type") != "workflow"
+                or site.get("html_url") != "https://kylehughes.github.io/swift-derived-keys/"):
+            raise SystemExit("Pages destination does not match the configured project site")
+        if (head.get("ref") != "refs/heads/main"
+                or head.get("object", {}).get("type") != "commit"
+                or head.get("object", {}).get("sha") != os.environ["CANDIDATE"]):
+            raise SystemExit("Documentation candidate is no longer the current main commit")
+        PY
     - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
       timeout-minutes: 5
       id: deployment

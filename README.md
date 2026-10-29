@@ -137,7 +137,7 @@ For children with different root types, use `at(_:)` with a key path to the chil
 
 ## Install and import
 
-Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies. Repository access is required. Use the development reference `main`:
+Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies. Private checkouts require repository access. Use the development reference `main`:
 
 ```swift
 .package(url: "https://github.com/kylehughes/swift-derived-keys", branch: "main")
