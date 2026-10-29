@@ -1,6 +1,10 @@
-**Technical specification: dependency-composed keys in Swift**
+# Technical specification: dependency-composed keys in Swift
 
-**1. Purpose and scope**
+Use the [README](README.md) for package usage and [maintenance guide](Documentation/Maintenance.md) for local check commands. The requirements below cover the generic core, UI support, and their validation.
+
+[Correctness contract](#2-fundamental-correctness-contract) · [Key-path sizing](#8a-key-path-size-recipes) · [Performance](#10-performance-requirements) · [Acceptance](#11-acceptance-criteria-and-deliverables)
+
+## 1. Purpose and scope
 
 Implement a reusable Swift library for deriving hashable keys from the subset of state that affects a particular computation.
 
@@ -20,7 +24,7 @@ Use Swift 6 language mode and strict concurrency checking. Build with the latest
 
 In this specification, **must** identifies a correctness or delivery requirement; **should** identifies a recommendation that requires a documented reason to depart from; **may** identifies an optional extension. This is an implementation contract, not a claim that an implementation has already been tested.
 
-**2. Fundamental correctness contract**
+## 2. Fundamental correctness contract
 
 For a computation:
 
@@ -54,7 +58,7 @@ Examples:
 
 These classifications depend on the actual calculation. The library cannot infer complete dependencies from a model’s fields.
 
-**3. Sources, composition, and evaluated keys**
+## 3. Sources, composition, and evaluated keys
 
 Provide three conceptual building blocks. Public names may differ, but their semantics must remain explicit.
 
@@ -91,7 +95,7 @@ An ordered collection must use order-sensitive equality. Unordered input must us
 
 Prefer typed structs and generic composition on common paths. Type erasure may support heterogeneous runtime collections, but must preserve node kind, namespace, concrete value-type distinctions, structural equality, and ownership/isolation constraints. Erasure must not reduce each dependency to an integer.
 
-**4. Hashing and equality**
+## 4. Hashing and equality
 
 Use Swift `Hashable` semantics: equal keys must hash equally; equal hashes do not establish equal keys. Hashing selects candidates; equality determines whether reuse is valid. [Swift Hashable documentation](https://developer.apple.com/documentation/swift/hashable).
 
@@ -107,7 +111,7 @@ An operation’s namespace must distinguish computations that happen to receive 
 
 Algorithm versions distinguish concurrently valid implementations when necessary. A process-local cache discarded on launch does not need versioning solely for app updates.
 
-**5. Evaluation, mutation, and consistency**
+## 5. Evaluation, mutation, and consistency
 
 The required baseline is **pull on evaluation**:
 
@@ -133,7 +137,7 @@ Do not expose an `update()` method that silently does nothing. If a later optimi
 
 When all captured dependency values return to their previous values, the evaluated key must equal the previous key. Content revisions may conservatively prevent reuse after content returns to an earlier value; document this behavior.
 
-**6. Generic cache contract**
+## 6. Generic cache contract
 
 Supply a small generic reference cache to demonstrate consumption of the keys. Its key and result types must be independent of UI frameworks.
 
@@ -173,7 +177,7 @@ A synchronous value-type cache with exclusive mutation is sufficient for the bas
 
 A shared concurrent or async cache is optional. If supplied, define duplicate-miss behavior, cancellation, failures, reentrancy, and clearing while work is in flight. Capture the request key before suspension, calculate from that request’s snapshot, and prevent cleared work from repopulating the cache under an obsolete generation. Do not add these complexities to the synchronous baseline without a use case.
 
-**7. Swift concurrency and ownership**
+## 7. Swift concurrency and ownership
 
 Keep pure key construction and immutable snapshots nonisolated. Add `Sendable` conformances only when stored components satisfy the corresponding transfer requirements.
 
@@ -187,15 +191,11 @@ Choose one owner for mutable cache storage: exclusive value ownership, an actor,
 
 Avoid ownership cycles between an owner, its stored sources, and their closures. Prefer passing explicit input snapshots. If a weak owner capture is used, represent owner disappearance explicitly; do not fabricate a default dependency that might hit an unrelated valid entry.
 
-**8. Reusable UIKit support and UI measurement examples**
-
-Vend a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
-
-Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
+## 8. Reusable UIKit support and UI measurement examples
 
 The README's primary example uses `DerivedKeysUI.SizeCache` to cache an individual measurement and compose text/button/parent sizes. Its application `DocumentContentView` performs frame-based layout using the same child handles. Keep the explicit-input, complete-frame `LayoutCache` example as an advanced alternative.
 
-**8a. Key-path size recipes**
+### 8a. Key-path size recipes
 
 Add a `DerivedKeysUI` production product without removing existing products. `SizeCache<Root>` is a main-actor reference facade whose initializer binds inferred heterogeneous hashable key paths, optional ordered child descriptions, explicit local capacity, and one synchronous measurement closure. Ordinary lookup is `size(of:toFit:)`. Root needs neither Hashable nor Sendable. Zero selected properties and zero children are valid. No user strings, erased wrappers, custom input structs, operation enums, macros, or builders are required.
 
@@ -210,6 +210,14 @@ Each facade uses the existing bounded LRU, with local count/capacity/removal/cle
 Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership and owns UIKit scheduling and outer-frame assignment.
 
 Validate heterogeneous/nested/zero dependencies, selected/unselected changes, both dimensions and normalization, transformed child proposals, parent-only and child-only changes, parent hits skipping child recency, three levels, all binding forms, root release, recipe scope, collisions, bounded eviction, zero capacity, independent clearing, and existing generic semantics. Compile real UIKit key paths at iOS 16 with Swift 6.4, test diagnostics in isolated processes, and measure snapshot, warm parent, parent miss with warm children, cold composed, and equivalent direct costs using the existing benchmark harness.
+
+### 8b. Explicit layout caching
+
+Vend a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
+
+Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
+
+### 8c. Text-component example
 
 Keep example-specific text/font/button policies in a non-product example target. Built-in text measurement helpers and Auto Layout integration are outside the production adapter's scope. Retain the richer child-composition example below as a secondary demonstration.
 
@@ -254,7 +262,7 @@ View reuse must work without view identity in the key: two views with equivalent
 
 Changing a dependency, requesting another size, scheduling layout, and publishing that size to a container are separate actions. The hashing library must not claim to schedule or repair UI layout automatically.
 
-**9. Non-UI example**
+## 9. Non-UI example
 
 Demonstrate a document exporter with the same key primitives and cache:
 
@@ -271,7 +279,9 @@ Exclude selection state, scrolling position, view dimensions, and share callback
 
 Changing an export option must recompute the output. Changing an unrelated UI property must reuse it. This example must compile in the generic package without UIKit, AppKit, SwiftUI, or CoreGraphics.
 
-**10. Performance requirements**
+## 10. Performance requirements
+
+### Key and storage costs
 
 Measure key work separately from the expensive computation being cached.
 
@@ -286,11 +296,13 @@ Measure key work separately from the expensive computation being cached.
 - Start with standard-library facilities. Add macros, custom storage, or specialized graph machinery only when a measured need justifies them.
 - Preserve each selected value's concrete hashing and equality through internal erasure, including collections. Direct snapshots and source-produced snapshots must use the same representation without requiring caller wrappers.
 
+### Benchmark coverage
+
 Benchmark release builds for direct computation, cold misses, warm hits, changing relevant inputs, changing irrelevant inputs, large payloads, shared dependencies, and eviction. Report compiler, hardware, workload, key cost, computation count, allocations where measurable, and retained memory. Do not set an unsupported universal speedup target.
 
 Actual UIKit fitting is the primary sizing evidence: compare equivalent direct and cached `UILabel`, `UITextView`, and document child/parent measurements on the main actor. Preserve UIKit's own warm behavior, include shared results across view instances, parent-only changes, transformed widths, content/typography changes, and bounded mixed traces with observed hits, misses, and eviction. Separate measurement-only timing from configuration work, validate results outside timing, and report repeated-trial variability. Identify Simulator results separately from physical-device results. Retain synthetic key and storage measurements as secondary diagnostics; fewer measurement calls alone do not establish a performance benefit.
 
-**11. Acceptance criteria and deliverables**
+## 11. Acceptance criteria and deliverables
 
 Implement deterministic tests covering:
 

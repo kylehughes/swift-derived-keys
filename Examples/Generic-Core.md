@@ -1,6 +1,6 @@
 # Using the generic key and memoization APIs
 
-Import `DerivedKeys` for non-UI computations, explicit snapshots, runtime source graphs, or typed operation keys. The [sizing convenience API](../README.md) uses the same snapshots and bounded storage while owning its main-actor measurement recipe.
+Import `DerivedKeys` for non-UI computations, explicit snapshots, runtime source graphs, or typed operation keys. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache. The [sizing convenience API](../README.md) uses the same snapshots and bounded storage while owning its main-actor measurement recipe.
 
 ## Selecting dependencies
 
@@ -60,9 +60,14 @@ Arrays preserve order. For unordered inputs, use a `Set`, a dictionary with its 
 
 The cache is a value type with exclusive mutation. Copies evolve independently, with standard-library copy-on-write costs on later mutation. Reentering the same cache during its calculation is unsupported; separate caches can be composed. Results, like keys, must not change meaning through mutable external aliases. Computations whose side effects must run on every call do not belong in this cache.
 
-Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement. `DerivedKeysUIKit.LayoutCache` is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities.
+Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement.
+
+### UIKit cache ownership
+
+`DerivedKeysUIKit.LayoutCache` is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities.
+
+## Account for cache costs
 
 Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. Use reusable immutable projections at controlled content-mutation boundaries when profiling warrants it. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
-
 
 See the [DocC dependency guide](../Documentation/DerivedKeys.docc/DependencyDesign.md) for the full ownership and equality contract.

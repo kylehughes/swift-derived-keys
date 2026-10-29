@@ -4,7 +4,7 @@
 vertical stack of plain text and an optional expansion button. The generic
 `DerivedKeys` library has no UIKit dependency. The supported fitting and cache API lives in `DerivedKeysUIKit`. UIKit declarations and tests use `#if canImport(UIKit)`.
 
-This example runs inside the repository. To integrate your own view in an app, start with the [UIKit guide](UI-Measurement.md) and the supported `DerivedKeysUIKit` product.
+This example runs inside the repository. To integrate your own view in an app, start with the [UIKit guide](UI-Measurement.md) and the supported `DerivedKeysUIKit` product. This text/button example demonstrates explicit composition of child dependency keys; the [size-cache guide](Size-Caches.md) covers the key-path sizing facade.
 
 ```swift
 import DerivedKeysUIExample
@@ -60,6 +60,8 @@ have no child key, so their title, style, font, and callback cannot invalidate t
 parent. Spacing is normalized to zero when no button exists. Parent keys compose
 child dependency keys, rather than sizes or hashes. All three operations have
 separate nominal namespaces and independently bounded LRU caches.
+
+## Layout policy
 
 Both children fit within the outer proposal minus padding. The parent stacks
 their independently measured sizes, adds visible-button spacing and padding,

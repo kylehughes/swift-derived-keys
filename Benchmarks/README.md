@@ -1,20 +1,12 @@
 # UIKit sizing benchmarks
 
-These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Start with the [measured results](UIKit-Results.md). The [synthetic diagnostics](Synthetic.md) remain available to investigate key and storage costs separately.
+These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Start with the [sizing and composition results](UIKit-Results.md), then the [UIKit versus model string results](String-Results.md) for the text-view lookup investigation. Both reports contain Simulator measurements. The [synthetic diagnostics](Synthetic.md) remain available to investigate key and storage costs separately.
 
 A cache hit still reads dependencies and hashes and compares their snapshots. It helps when that work costs less than the measurement it avoids, often enough to cover misses and eviction. Fewer measurement calls alone do not establish a speedup.
 
 ## Run on a device or Simulator
 
-Select the package's Xcode 27.1 / Swift 6.4 toolchain. To use a connected device with an existing local signing configuration:
-
-```sh
-python3 Benchmarks/run-uikit.py \
-    --destination 'platform=iOS,id=DEVICE_UDID' \
-    --development-team YOUR_TEAM_ID
-```
-
-The runner does not enable provisioning updates. With no destination, it creates an iOS Simulator, runs the benchmark, then deletes only that Simulator:
+Select the package's Xcode 27.1 / Swift 6.4 toolchain. With no destination, the runner creates an iOS Simulator, runs the benchmark, then deletes only that Simulator:
 
 ```sh
 python3 Benchmarks/run-uikit.py
@@ -22,7 +14,17 @@ python3 Benchmarks/run-uikit.py
 
 An explicit Simulator destination is also supported. Explicit destinations are preserved. The runner builds the actual package in **Release**, disables code coverage and parallel testing, then runs one XCTest case from `DerivedKeysUIExampleTests`. No app product or dependency is added to the package. The test's ordinary non-benchmark invocation exercises a small correctness trace instead of skipping the test.
 
-Defaults are 128 requests per timed loop and nine paired trials per workload. Each cache has capacity 16, independent of those settings. Use `--iterations` (48–512), `--trials` (3–30), and `--output` (a new directory) to select another bounded run. Keep generated evidence outside tracked source.
+The runner accepts physical-device destinations and local signing arguments, but the current package scheme uses tool-hosted tests. Xcode 27.1 rejected device execution because it requires a host application. A connected-device build succeeded; no device timings were collected. Running this fixture on hardware requires an app-hosted test target, which this repository does not currently provide. The runner does not enable provisioning updates.
+
+The default `sizing` suite uses 128 requests per timed loop and nine paired trials per workload. Each cache has capacity 16, independent of those settings. Use `--iterations` (48–512), `--trials` (3–30), and `--output` (a new directory) to select another bounded sizing run. Keep generated evidence outside tracked source.
+
+Run the focused string-representation comparison with:
+
+```sh
+python3 Benchmarks/run-uikit.py --suite strings
+```
+
+This suite fixes 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation. The following workload description covers the default sizing suite.
 
 The output includes the raw XCTest result, JSON attachment, commands, toolchain and destination metadata, candidate source fingerprints, and a receipt. Missing tests, failed comparisons, incomplete observations, and source changes during execution fail the runner. Its parser controls are available with:
 
@@ -84,7 +86,11 @@ The same XCTest includes separate stable-input phases for warmed UIKit fitting, 
 
 Use ordinary stable values first. The core retains each selected value behind a private generic wrapper before erasure, preserving that value's concrete hashing and equality. Callers do not need to wrap arrays or other values to avoid element-wise erasure inside `AnyHashable`.
 
-For large content, an optional compact semantic projection can reduce hashing work: a content identity together with a reliable revision that changes whenever any size-relevant content changes. Select existing identity and revision properties directly, or a computed immutable snapshot property when useful. The revision contract belongs to the application; identity alone cannot represent edits, and a revision that misses changes makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. Typography and other independent layout inputs still need their own dependencies.
+If a model already owns the authoritative text, select it by key path and keep the rendered view synchronized. The [model-text example](../Examples/Size-Caches.md#select-authoritative-model-text) uses `\.model.text` and the actual font. In the Simulator string comparison, identical long ASCII text cost 62.98 µs to hash after a UIKit read versus 1.26 µs from native model storage. Complete warm requests cost 149.75 versus 3.56 µs. This supports a representation-related explanation for much of the earlier text-view lookup cost; the generic core remains unchanged.
+
+Explicitly making the UIKit string contiguous on every request improved that warm lookup to 36.70 µs, including conversion. It remained more expensive than selecting the existing model value, and changing-input workloads were dominated by configuration and measurement. The [full results](String-Results.md) include non-ASCII content, variability, and the limits of this comparison. Model strings can also have noncontiguous storage. Do not assume a storage representation from the property's type, or normalize every string without measuring the complete request.
+
+If full-content hashing remains a bottleneck after that comparison, an optional compact semantic projection can reduce hashing work: a content identity together with a reliable revision that changes whenever any size-relevant content changes. Select existing identity and revision properties directly, or a computed immutable snapshot property when useful. The revision contract belongs to the application; identity alone cannot represent edits, and a revision that misses changes makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. Typography and other independent layout inputs still need their own dependencies.
 
 Profile the application's actual hit rate, content, and fitting methods before choosing this projection. A small view with an inexpensive warm UIKit fit may be better served by direct measurement or one stored result. The [README](../README.md) keeps the convenient sizing and recursive reuse API in view.
 

@@ -60,11 +60,40 @@ Descriptions retain dependency readers only. A descriptor from `child.at(\.title
 
 A key path to a `Hashable` class can still return a mutable alias. Prefer a value snapshot, such as a computed `measurementContent` property returning immutable text and style data, and select `\.measurementContent`. Do not use a document ID alone to represent edits under the same ID. The core's explicit projections and snapshots remain available for more involved value selection.
 
-For large content, an optional compact projection is the content's identity together with a reliable revision that changes on every size-relevant edit. Select those existing properties by key path; no wrapper is needed. Independent typography and layout inputs still need dependencies. A revision that misses an edit makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. See the [performance guide](../Benchmarks/README.md#choosing-dependencies-for-an-application) before choosing a projection.
+### Select authoritative model text
+
+When the application already owns the displayed text, select that model property directly. In this example, `ArticleView.model` contains an ordinary `Article` value whose `text` is a `String`. Assigning or editing the model updates `textView.text` before the next size request:
+
+```swift
+@MainActor
+func makeArticleTextSizes() -> SizeCache<ArticleView> {
+    SizeCache<ArticleView>(
+        dependingOn: \.model.text,
+        \.textView.font,
+        capacity: 256
+    ) { view, proposal in
+        view.textView.sizeThatFits(proposal)
+    }
+}
+```
+
+Retain the returned cache in the application's chosen owner, then call `textSizes.size(of: view, toFit: proposal)`. The [complete iOS 16 compiler fixture](../Fixtures/iOS/ModelTextExample.swift) includes the model, view, and an edit followed by another lookup. It fixes wrapping, text-container insets, padding, direction, and editing/scrolling settings; changing any of those requires another dependency. Font is selected explicitly. Model changes schedule layout, while the owner remains responsible for fitting and assigning the view's frame.
+
+Equal strings can have different storage representations and hashing costs. In the [UIKit string measurements](../Benchmarks/String-Results.md), selecting native model text was substantially cheaper for repeated requests than reading identical text back from `UITextView`. Swift model storage is not a guarantee of contiguous UTF-8: a string assigned from UIKit can retain its representation. The package does not normalize strings automatically.
+
+The model must remain authoritative and agree with the rendered content during measurement. If editing happens in the text view, synchronize the model before lookup or select the text view's current text. A stale model key can reuse an incorrect size. Full text remains a valid dependency; no content ID, revision, or custom wrapper is required.
+
+### Consider a compact projection after measuring
+
+If full-content hashing still dominates, an optional compact projection is the content's identity together with a reliable revision that changes on every size-relevant edit. Select those existing properties by key path; no wrapper is needed. Independent typography and layout inputs still need dependencies. A revision that misses an edit makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. See the [performance guide](../Benchmarks/README.md#choosing-dependencies-for-an-application) before choosing a projection.
+
+## Inspect snapshots and composition limits
 
 Selection and calculation are synchronous on the main actor. Keep selected values and any other result-relevant state consistent throughout the request. Dependency getters should read values without mutation, I/O, or recursive evaluation. A hit still reads all declared dependencies and hashes/compares their full snapshots, but does not invoke measurements or consult child result storage. `snapshot(of:)` exposes the dependency snapshot for inspection; it excludes proposal and recipe identity and is not a standalone complete result key.
 
 The immutable graph cannot be cycled through public construction. Its limit is 64 snapshot nodes per path, counting value leaves and composition boundaries. Mapping adds no boundary. An empty cache has depth one; a cache selecting a property has depth two; a parent adds one. Excess depth fails a descriptive precondition. Same-cache measurement reentry, including result inspection/removal through an alias, also fails a precondition; nesting different caches is supported.
+
+## Integrate with UIKit layout
 
 Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes its text and category-only font settings before a direct leaf measurement; it schedules layout when content or category changes. The controller still owns refitting and assigning the container frame.
 

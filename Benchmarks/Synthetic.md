@@ -1,6 +1,8 @@
 # Synthetic diagnostics
 
-These release benchmarks isolate key construction, hashing, equality during lookup, and bounded storage around a synthetic calculation. Use them to investigate overhead and regressions. The [UIKit benchmarks](README.md) address application measurement; synthetic results do not establish UIKit usefulness. The historical [generic release sample](Results.md) and [size-facade release sample](Size-Results.md) retain their original timings and source fingerprints.
+These release benchmarks isolate key construction, hashing, equality during lookup, and bounded storage around a synthetic calculation. Use them to investigate overhead and regressions. The [UIKit benchmarks](README.md) address application measurement; synthetic results do not establish UIKit usefulness.
+
+The [concrete-erasure comparison](Erasure-Results.md) records the internal representation repair. The historical [generic release sample](Results.md) and [size-facade release sample](Size-Results.md) retain their original timings and source fingerprints.
 
 ## Run the suite
 

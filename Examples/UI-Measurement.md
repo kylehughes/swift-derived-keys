@@ -42,7 +42,7 @@ The bridge reserves the greatest finite value as a sentinel. A manually construc
 
 The cache neither clamps nor rounds a result. Pass the proposal you actually use for measurement. If your algorithm intentionally ignores height, construct a width-only proposal in both `sizeThatFits(_:)` and `layoutSubviews()`; keying one with natural height and the other with `bounds.height` would describe different requests.
 
-The README view fills a finite requested width and returns natural height. A parent assigns the fitted frame before normal UIKit layout. A natural-width request uses an unconstrained proposal, so assigning its finite result produces a distinct request on the following layout pass. Widths below the fixed padding yield zero-width text; invalid widths return zero at the view boundary. These are example policies, not rules imposed by the library.
+The compiled `LabelView` example fills a finite requested width and returns natural height. A parent assigns the fitted frame before normal UIKit layout. A natural-width request uses an unconstrained proposal, so assigning its finite result produces a distinct request on the following layout pass. Widths below the fixed padding yield zero-width text; invalid widths return zero at the view boundary. These are example policies, not rules imposed by the library.
 
 ## Share and compose
 
@@ -55,7 +55,7 @@ let first = LabelView(text: "Shared content", cache: cache)
 let second = LabelView(text: "Shared content", cache: cache)
 ```
 
-The README uses a minimal per-view declaration; the [full source](../Sources/DerivedKeysUIExample/LabelView.swift) adds this initializer and calculation counters. Two views with equal captured inputs and proposals can share a result without including view identity. A reused view with changed text requests a different entry. Returning from A to B to A can reuse A while its entry remains retained.
+The [full source](../Sources/DerivedKeysUIExample/LabelView.swift) includes this initializer and calculation counters. Two views with equal captured inputs and proposals can share a result without including view identity. A reused view with changed text requests a different entry. Returning from A to B to A can reuse A while its entry remains retained.
 
 Use `key(for:proposal:context:)` when composing child layouts. It returns `LayoutKey`, a core `RequestKey` whose `LayoutInputs` contain the complete input and proposal. Store complete child keys in the parent's hashable input alongside parent-only values, rather than composing hash integers or measured sizes. Distinct operation types and the cache's fixed `version` separate algorithms. The [text/button demonstration](Text-Component.md) illustrates independently cached children and an optional child dependency.
 

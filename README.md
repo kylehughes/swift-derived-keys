@@ -19,6 +19,8 @@ Create caches once in a retained main-actor owner. The walkthrough builds one me
 
 `DocumentContentView` below is an application type. Its `content` is a stable `Hashable` value—in the [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift), a `String`. `isExpanded` controls the line limit. The example fixes typography rules and the button title, and explicitly selects Dynamic Type. Additional variable measurement inputs need additional dependencies.
 
+The example selects the application's stored content. If a separate model owns the text, select a key path such as `\.model.text`; the [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit.
+
 ```swift
 import DerivedKeysUI
 import UIKit

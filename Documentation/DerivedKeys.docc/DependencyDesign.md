@@ -16,22 +16,22 @@ Live providers execute synchronously during source evaluation. Closure providers
 
 The source owns its provider captures. The snapshot owns values and structure, and the cache owns keys and results. Prefer explicit inputs to avoid retaining a model through a source. A weak capture must distinguish owner disappearance from a valid dependency. None of these abstractions deep-copy arbitrary references: capture immutable content instead of a mutable `Hashable` object.
 
+Typed snapshots and caches transfer only when their components are `Sendable`. Erased snapshots and source recipes deliberately do not promise transfer safety. The generic module is nonisolated; a UI adapter captures and measures within the main actor.
+
 ## Preserve structure and equality
 
 Original and derived nodes are different forms. Labels distinguish roles; order, multiplicity, optional presence, concrete value types, and child boundaries remain significant. Empty compositions are constants in their labeled schema. Use arrays for ordered data and an order-independent representation for unordered data. Immutable construction keeps graph edges acyclic. Runtime graphs support up to 64 nodes per root-to-leaf path; deeper construction throws.
 
 Never use a finalized integer hash as a semantic key. Collisions are legal, and dictionary equality must still compare the complete key. `Hasher` output is process-local, unsuitable for serialization or a stable content identifier. An ID plus revision can replace a large content projection only when every relevant mutation changes the revision and the pair uniquely identifies immutable content within the cache's scope.
 
-## Choose the cost you need
-
-Typed structs avoid the erased graph's per-evaluation node dictionary and arrays. A bulk source initializer constructs an ordered child collection in linear time; repeated immutable appends can take quadratic total work. Provider work is separate from hashing and equality, which inspect content and repeated child occurrences. A shared graph node saves provider reads, not necessarily all later key hashing.
-
-``MemoizationCache`` uses bounded LRU storage. Its capacity bounds entries rather than bytes, so account for retained key content and results. Standard-library copy-on-write can copy storage after a cache value is copied. A cache hit skips the calculation entirely, so side effects required on every request must occur outside it.
-
-Typed snapshots and caches transfer only when their components are `Sendable`. Erased snapshots and source recipes deliberately do not promise transfer safety. The generic module is nonisolated; a UI adapter captures and measures within the main actor.
-
 ## Compose captured values directly
 
 ``DependencySnapshot/init(value:)`` retains a full hashable value and its concrete type. ``DependencySnapshot/init(children:)`` composes already captured snapshots in order, with the same 64-node depth bound. These unlabeled forms use empty labels and equal equivalent empty-label source snapshots. They are useful when the caller already owns selection and isolation; the core adds no UI or global-actor dependency.
 
 The sizing facade in `DerivedKeysUI` captures main-actor key-path values into this representation. Its traversal evaluates each declared occurrence independently, including mapped bindings; that differs from `KeySource`'s request-local shared-node memoization. Both preserve complete values and structure.
+
+## Choose the cost you need
+
+Typed structs avoid the erased graph's per-evaluation node dictionary and arrays. A bulk source initializer constructs an ordered child collection in linear time; repeated immutable appends can take quadratic total work. Provider work is separate from hashing and equality, which inspect content and repeated child occurrences. A shared graph node saves provider reads, not necessarily all later key hashing.
+
+``MemoizationCache`` uses bounded LRU storage. Its capacity bounds entries rather than bytes, so account for retained key content and results. Standard-library copy-on-write can copy storage after a cache value is copied. A cache hit skips the calculation entirely, so side effects required on every request must occur outside it.

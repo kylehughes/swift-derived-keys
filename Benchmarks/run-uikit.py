@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run opt-in UIKit sizing timings in Release and retain a local evidence bundle.
+"""Run opt-in UIKit sizing or String timings in Release and retain a local evidence bundle.
 
 With no destination, creates and removes its own disposable iOS Simulator.
 An explicit destination must be platform=iOS,id=UDID or platform=iOS Simulator,id=UUID;
@@ -24,6 +24,11 @@ ROOT = Path(__file__).resolve().parent.parent
 TARGET = "DerivedKeysUIExampleTests"
 TEST = TARGET + "/UIKitSizingBenchmarkTests/testSizingBenchmarks"
 ATTACHMENT = "DerivedKeysUIKitBenchmarks.json"
+SUITES = {
+    "sizing": (TEST, ATTACHMENT),
+    "strings": (TARGET + "/UIKitStringBenchmarkTests/testStringRepresentationBenchmarks",
+                "DerivedKeysUIKitStringBenchmarks.json"),
+}
 COST_INTERPRETATION = (
     "Separate stable-input phases include their observation overhead; "
     "subtracting phases does not isolate LRU bookkeeping"
@@ -84,20 +89,36 @@ def inject_environment(document, environment):
     return document
 
 
-def read_attachment(directory, device_id):
-    manifest = json.loads((directory / "manifest.json").read_text())
+def strict_json(text):
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate JSON object key: " + key)
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("Nonfinite JSON constant: " + value)
+
+    return json.loads(text, object_pairs_hook=unique_object, parse_constant=reject_constant)
+
+
+def read_attachment(directory, device_id, suite="sizing"):
+    selected_test, attachment_name = SUITES[suite]
+    manifest = strict_json((directory / "manifest.json").read_text())
     matches = []
     support = simulator_tools()
     for test in manifest:
         identity = test.get("testIdentifier", "").removesuffix("()")
-        if identity not in {TEST, TEST.split("/", 1)[1]}:
+        if identity not in {selected_test, selected_test.split("/", 1)[1]}:
             continue
-        if not support.test_identity_matches_url(TEST, test.get("testIdentifierURL", "")):
+        if not support.test_identity_matches_url(selected_test, test.get("testIdentifierURL", "")):
             raise ValueError("Benchmark attachment test URL does not match its identity")
         for attachment in test.get("attachments", []):
             name = attachment.get("suggestedHumanReadableName", "")
-            if name == ATTACHMENT or re.fullmatch(
-                    r"DerivedKeysUIKitBenchmarks_[0-9]+_[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-"
+            if name == attachment_name or re.fullmatch(
+                    re.escape(Path(attachment_name).stem) + r"_[0-9]+_[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-"
                     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\.json", name):
                 if attachment.get("deviceId") != device_id or attachment.get("isAssociatedWithFailure") is not False:
                     raise ValueError("Benchmark attachment has an unexpected device or failure association")
@@ -107,10 +128,12 @@ def read_attachment(directory, device_id):
                 matches.append(path)
     if len(matches) != 1 or not matches[0].is_file() or matches[0].stat().st_size == 0:
         raise ValueError("Expected one nonempty benchmark JSON attachment")
-    return json.loads(matches[0].read_text()), matches[0]
+    return strict_json(matches[0].read_text()), matches[0]
 
 
-def validate_payload(payload, iterations, trials):
+def validate_payload(payload, iterations, trials, suite="sizing"):
+    if suite == "strings":
+        return validate_string_payload(payload, iterations, trials)
     # The benchmark's versioned contract is validated below; malformed or missing data fails closed.
     if payload.get("schemaVersion") != 1:
         raise ValueError("Unsupported benchmark attachment schema")
@@ -248,8 +271,167 @@ def validate_cost_diagnostics(payload):
             "checksumsValidated": True, "interpretation": COST_INTERPRETATION}
 
 
+STRING_CONTENTS = ("short-ascii", "long-ascii", "long-non-ascii")
+STRING_SCENARIOS = ("repeated-warm", "mutation-return", "mixed-bounded")
+STRING_STRATEGIES = ("direct", "uikit-text", "model-text", "contiguous-uikit-text")
+STRING_PHASES = ("dependency-read-64-slots", "snapshot-capture-64-slots",
+                 "string-hash-pre-read", "snapshot-hash-preconstructed")
+
+
+STRING_TIMING_SUFFIX = (
+    "complete direct fit or SizeCache.size including dependency reads, per-request normalization where selected, "
+    "snapshot, hashing, equality, lookup/miss fit, and preallocated CGSize-buffer write"
+)
+STRING_TIMING_BOUNDARIES = {
+    scenario: ("No configuration in loop; " if scenario == "repeated-warm" else
+               "Identical model.text and UITextView.text setters before every request; ") + STRING_TIMING_SUFFIX
+    for scenario in STRING_SCENARIOS
+}
+STRING_PHASE_INTERPRETATION = (
+    "Fixed phase order; separate observations include buffer/call overhead and are not additive or suitable for exact subtraction. "
+    "String hashing uses pre-read values; complete lookup includes all capture and normalization."
+)
+STRING_PHASE_BOUNDARIES = {
+    "dependency-read-64-slots": "Selected dependency read including makeContiguousUTF8 only for contiguous-uikit-text, plus preallocated 64-slot String writes",
+    "snapshot-capture-64-slots": "SizeCache.snapshot capture of actual selected text/font key paths, including selected normalization, plus preallocated 64-slot snapshot writes",
+    "string-hash-pre-read": "Public hashValue of 64 pre-read Strings, no getter/normalization in timing, plus UInt64 accumulation and non-inlined call",
+    "snapshot-hash-preconstructed": "Public hashValue of 64 preconstructed snapshots, no capture in timing, plus UInt64 accumulation and non-inlined call",
+}
+STRING_FIXTURE_OWNERSHIP = (
+    "Fresh independent fixture per arm/trial; same native model and actual UITextView configuration; "
+    "no timed counters; rotating four-arm order"
+)
+STRING_COUNTS = {
+    "direct": (0, 0, 128, 0, False, False),
+    "repeated-warm": (128, 0, 0, 1, False, False),
+    "mutation-return": (124, 4, 4, 5, False, True),
+    "mixed-bounded": (65, 63, 63, 16, True, False),
+}
+
+
+def validate_string_payload(payload, iterations, trials):
+    def require(condition, message):
+        if not condition:
+            raise ValueError(message)
+
+    def positive(value):
+        return type(value) in (int, float) and math.isfinite(value) and value > 0
+
+    def identities(rows, keys, expected):
+        actual = [tuple(row.get(key) for key in keys) for row in rows]
+        require(len(actual) == len(expected) and set(actual) == expected,
+                "String benchmark rows are missing, duplicated, or unexpected")
+
+    def samples(row, count, operations, checksum_string=False):
+        values = row.get("trials", [])
+        require(len(values) == count and all(type(value.get("index")) is int for value in values)
+                and [value["index"] for value in values] == list(range(count)),
+                "String benchmark trials must be distinct and ordered")
+        for value in values:
+            elapsed, per_operation = value.get("elapsedNanoseconds"), value.get("nanosecondsPerOperation")
+            require(type(elapsed) is int and 0 < elapsed < 2 ** 64 and positive(per_operation)
+                    and math.isclose(per_operation, elapsed / operations, rel_tol=1e-12)
+                    and value.get("resultsValidated") is True, "Invalid string benchmark timing or equivalence")
+            checksum, expected = value.get("checksum"), value.get("expectedChecksum")
+            if checksum_string:
+                require(isinstance(checksum, str) and checksum == expected
+                        and re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", checksum) is not None
+                        and Decimal(checksum).is_finite() and Decimal(checksum) >= 0,
+                        "Invalid string phase checksum")
+            else:
+                require(positive(checksum) and type(expected) in (int, float) and checksum == expected,
+                        "Invalid string benchmark checksum")
+        return values
+
+    require(type(payload.get("schemaVersion")) is int and payload["schemaVersion"] == 1,
+            "Unsupported string benchmark schema")
+    require(iterations == 128 and trials == 9 and type(payload.get("iterations")) is int
+            and payload["iterations"] == 128 and type(payload.get("trials")) is int
+            and payload["trials"] == 9 and type(payload.get("capacity")) is int
+            and payload["capacity"] == 16 and payload.get("benchmarkEnabled") is True,
+            "String benchmark requires 128 operations, nine trials, and capacity 16")
+    require(payload.get("fixtureOwnership") == STRING_FIXTURE_OWNERSHIP
+            and type(payload.get("warmupIterationsPerView")) is int and payload["warmupIterationsPerView"] == 8
+            and type(payload.get("width")) is int and payload["width"] == 180
+            and type(payload.get("fontPointSize")) is int and payload["fontPointSize"] == 17,
+            "String fixture configuration changed")
+    runtime = payload.get("runtime", {})
+    require(all(isinstance(runtime.get(key), str) and runtime[key]
+                for key in ("deviceName", "model", "systemName", "systemVersion"))
+            and type(runtime.get("isSimulator")) is bool, "Missing string benchmark runtime")
+    rows = payload.get("rows", [])
+    identities(rows, ("content", "scenario", "strategy"),
+               {(content, scenario, strategy) for content in STRING_CONTENTS
+                for scenario in STRING_SCENARIOS for strategy in STRING_STRATEGIES})
+    checksums = {}
+    for row in rows:
+        require(type(row.get("iterations")) is int and row["iterations"] == 128
+                and type(row.get("capacity")) is int and row["capacity"] == 16
+                and row.get("resultsValidated") is True and row.get("timingBoundary") == STRING_TIMING_BOUNDARIES[row["scenario"]],
+                "Invalid string row parameters or timing boundary")
+        values = samples(row, 9, 128)
+        for value in values:
+            require(type(value.get("orderIndex")) is int
+                    and value["orderIndex"] == (STRING_STRATEGIES.index(row["strategy"]) - value["index"]) % 4,
+                    "String strategy order does not rotate by trial")
+            identity = (row["content"], row["scenario"], value["index"])
+            if identity in checksums:
+                require(checksums[identity] == value["checksum"], "String strategy results disagree")
+            checksums[identity] = value["checksum"]
+        diagnostic = row.get("diagnostics", {})
+        require(type(diagnostic.get("iterations")) is int and diagnostic["iterations"] == 128
+                and diagnostic.get("resultsValidated") is True
+                and type(diagnostic.get("distinctHeightsObserved")) is bool
+                and diagnostic["distinctHeightsObserved"] is (row["scenario"] != "repeated-warm")
+                and type(diagnostic.get("restoredResultValidated")) is bool
+                and diagnostic["restoredResultValidated"] is (row["scenario"] == "mutation-return")
+                and type(diagnostic.get("evictionObserved")) is bool
+                and type(diagnostic.get("returnHitValidated")) is bool,
+                "Invalid string diagnostic validation flags")
+        for key in ("hits", "misses", "measurementCount", "entryCount"):
+            require(type(diagnostic.get(key)) is int and diagnostic[key] >= 0,
+                    "Invalid string diagnostic counts")
+        expected = STRING_COUNTS["direct" if row["strategy"] == "direct" else row["scenario"]]
+        require(tuple(diagnostic[key] for key in ("hits", "misses", "measurementCount", "entryCount",
+                                                  "evictionObserved", "returnHitValidated")) == expected,
+                "String counts, invalidation, reuse, or eviction differ from the bounded workload")
+    require(type(payload.get("phaseIterations")) is int and payload["phaseIterations"] == 512
+            and type(payload.get("phaseTrials")) is int and payload["phaseTrials"] == 5
+            and payload.get("phaseOrder") == list(STRING_PHASES)
+            and payload.get("phaseInterpretation") == STRING_PHASE_INTERPRETATION,
+            "Invalid string cost phase contract")
+    phases = payload.get("costDiagnostics", [])
+    identities(phases, ("content", "strategy", "phase"),
+               {(content, strategy, phase) for content in STRING_CONTENTS
+                for strategy in STRING_STRATEGIES[1:] for phase in STRING_PHASES})
+    for row in phases:
+        require(type(row.get("iterations")) is int and row["iterations"] == 512
+                and row.get("resultsValidated") is True
+                and row.get("timingBoundary") == STRING_PHASE_BOUNDARIES[row["phase"]],
+                "Invalid string cost phase parameters or boundary")
+        samples(row, 5, 512, checksum_string=True)
+    representations = payload.get("representations", [])
+    identities(representations, ("content", "strategy"),
+               {(content, strategy) for content in STRING_CONTENTS for strategy in STRING_STRATEGIES[1:]})
+    lengths = {}
+    for representation in representations:
+        require(type(representation.get("utf8Length")) is int
+                and representation["utf8Length"] > 0
+                and all(type(representation.get(key)) is bool for key in
+                        ("isContiguousUTF8", "rawUIKitIsContiguousUTF8", "sourceIsContiguousUTF8")),
+                "Invalid string representation metadata")
+        content = representation["content"]
+        require(content not in lengths or lengths[content] == representation["utf8Length"],
+                "String representation lengths disagree across strategies")
+        lengths[content] = representation["utf8Length"]
+    return {"rowCount": 36, "trialsPerRow": 9, "checksumsValidated": True,
+            "diagnosticsValidated": True, "representationCount": 9,
+            "costDiagnostics": {"rowCount": 36, "iterationsPerTrial": 512, "trialsPerRow": 5}}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", choices=SUITES, default="sizing", help="Benchmark suite (default sizing)")
     parser.add_argument("--destination", help="Explicit platform=iOS,id=UDID or platform=iOS Simulator,id=UUID")
     parser.add_argument("--development-team", help="Locally configured signing team for an explicit physical device")
     parser.add_argument("--runtime", help="Runtime for the automatically created Simulator; default latest available")
@@ -260,6 +442,9 @@ def main():
     args = parser.parse_args()
     if not 48 <= args.iterations <= 512 or not 3 <= args.trials <= 30 or args.timeout <= 0:
         parser.error("Require iterations 48–512, trials 3–30, and positive timeout")
+    if args.suite == "strings" and (args.iterations != 128 or args.trials != 9):
+        parser.error("The strings suite requires exactly 128 iterations and 9 trials")
+    selected_test, _ = SUITES[args.suite]
     try:
         chosen = destination(args.destination) if args.destination else None
     except ValueError as error:
@@ -280,7 +465,7 @@ def main():
     receipt = {"schemaVersion": 1, "startedUTC": datetime.now(timezone.utc).isoformat(),
                "evidenceDirectory": str(directory), "status": "failed", "configuration": "Release",
                "codeCoverage": False, "parallelTesting": False, "iterations": args.iterations,
-               "trials": args.trials, "capacity": 16, "selectedTest": TEST}
+               "trials": args.trials, "capacity": 16, "selectedTest": selected_test, "suite": args.suite}
     owned_id = None
     creation_attempted = False
     existing_devices = set()
@@ -349,14 +534,14 @@ def main():
                                   "-destination", destination_string, "-configuration", "Release",
                                   "-resultBundlePath", str(result_path), "-enableCodeCoverage", "NO",
                                   "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never",
-                                  "-only-testing:" + TEST],
+                                  "-only-testing:" + selected_test],
                                  "test-without-building", timeout=args.timeout, check=False)
         report = commands.json(["xcrun", "xcresulttool", "get", "test-results", "tests", "--path", str(result_path)],
                                "test-results")
         summary = commands.json(["xcrun", "xcresulttool", "get", "test-results", "summary", "--path", str(result_path)],
                                 "summary")
         # xcresult identifiers include parentheses even though -only-testing uses the method name.
-        receipt["testValidation"] = support.observe_results([TEST + "()"], [TARGET], report, summary, chosen["id"])
+        receipt["testValidation"] = support.observe_results([selected_test + "()"], [TARGET], report, summary, chosen["id"])
         receipt["actualDestination"] = {"platform": chosen["platform"], "devices": report.get("devices"),
                                          "configurations": summary.get("devicesAndConfigurations")}
         attachments = directory / "attachments"
@@ -364,8 +549,8 @@ def main():
         # xcresulttool's test-id grammar differs from xcodebuild's -only-testing grammar.
         commands.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result_path),
                       "--output-path", str(attachments)], "export-attachments")
-        payload, attachment = read_attachment(attachments, chosen["id"])
-        receipt["payloadValidation"] = validate_payload(payload, args.iterations, args.trials)
+        payload, attachment = read_attachment(attachments, chosen["id"], args.suite)
+        receipt["payloadValidation"] = validate_payload(payload, args.iterations, args.trials, args.suite)
         receipt["actualDestination"]["runtime"] = payload["runtime"]
         if payload["runtime"]["isSimulator"] != (chosen["platform"] == "iOS Simulator"):
             raise ValueError("Attachment runtime disagrees with destination platform")
@@ -399,7 +584,7 @@ def main():
         receipt["finishedUTC"] = datetime.now(timezone.utc).isoformat()
         (directory / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
         (directory / "receipt.txt").write_text(
-            f"UIKit sizing benchmark: {receipt['status']}\nConfiguration: Release; coverage: NO; parallel testing: NO\n"
+            f"UIKit {args.suite} benchmark: {receipt['status']}\nConfiguration: Release; coverage: NO; parallel testing: NO\n"
             f"Iterations: {args.iterations}; trials: {args.trials}; capacity: 16\n"
             f"Candidate: {receipt.get('candidate', {}).get('head', 'unavailable')}; "
             f"dirty: {receipt.get('candidate', {}).get('dirty', 'unknown')}\n"

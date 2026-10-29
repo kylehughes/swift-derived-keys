@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("run_uikit", Path(__file__).with_name("run-uikit.py"))
 runner = importlib.util.module_from_spec(spec)
@@ -237,6 +238,136 @@ class RunnerParserTests(unittest.TestCase):
             (directory / "payload.json").write_text("")
             with self.assertRaises(ValueError):
                 runner.read_attachment(directory, "device")
+
+    def valid_string_payload(self):
+        rows = []
+        for content in runner.STRING_CONTENTS:
+            for scenario in runner.STRING_SCENARIOS:
+                for strategy_index, strategy in enumerate(runner.STRING_STRATEGIES):
+                    counts = runner.STRING_COUNTS["direct" if strategy == "direct" else scenario]
+                    rows.append({"content": content, "scenario": scenario, "strategy": strategy,
+                                 "iterations": 128, "capacity": 16, "resultsValidated": True,
+                                 "timingBoundary": runner.STRING_TIMING_BOUNDARIES[scenario],
+                                 "diagnostics": dict(zip(("hits", "misses", "measurementCount", "entryCount",
+                                                           "evictionObserved", "returnHitValidated"), counts),
+                                                     resultsValidated=True, iterations=128,
+                                                     distinctHeightsObserved=scenario != "repeated-warm",
+                                                     restoredResultValidated=scenario == "mutation-return"),
+                                 "trials": [{"index": index, "orderIndex": (strategy_index - index) % 4,
+                                             "elapsedNanoseconds": 256, "nanosecondsPerOperation": 2,
+                                             "checksum": 100, "expectedChecksum": 100, "resultsValidated": True}
+                                            for index in range(9)]})
+        phases = [{"content": content, "strategy": strategy, "phase": phase, "iterations": 512,
+                   "timingBoundary": runner.STRING_PHASE_BOUNDARIES[phase], "resultsValidated": True,
+                   "trials": [{"index": index, "elapsedNanoseconds": 1024, "nanosecondsPerOperation": 2,
+                               "checksum": "0", "expectedChecksum": "0", "resultsValidated": True}
+                              for index in range(5)]}
+                  for content in runner.STRING_CONTENTS for strategy in runner.STRING_STRATEGIES[1:]
+                  for phase in runner.STRING_PHASES]
+        return {"schemaVersion": 1, "benchmarkEnabled": True, "iterations": 128, "trials": 9, "capacity": 16,
+                "runtime": self.valid_payload()["runtime"], "rows": rows,
+                "fixtureOwnership": runner.STRING_FIXTURE_OWNERSHIP, "warmupIterationsPerView": 8,
+                "width": 180, "fontPointSize": 17, "costDiagnostics": phases,
+                "phaseIterations": 512, "phaseTrials": 5, "phaseOrder": list(runner.STRING_PHASES),
+                "phaseInterpretation": runner.STRING_PHASE_INTERPRETATION,
+                "representations": [{"content": content, "strategy": strategy,
+                                     "utf8Length": {"short-ascii": 8, "long-ascii": 2048, "long-non-ascii": 4096}[content], "isContiguousUTF8": True,
+                                     "rawUIKitIsContiguousUTF8": False, "sourceIsContiguousUTF8": True}
+                                    for content in runner.STRING_CONTENTS for strategy in runner.STRING_STRATEGIES[1:]]}
+
+    def test_string_suite_exact_contract_and_observed_representations(self):
+        payload = self.valid_string_payload()
+        self.assertEqual(runner.validate_payload(payload, 128, 9, "strings")["rowCount"], 36)
+        for item in payload["representations"]:
+            item["isContiguousUTF8"] = False
+        runner.validate_payload(payload, 128, 9, "strings")
+        with self.assertRaises(ValueError):
+            runner.validate_payload(payload, 128, 9)
+        with self.assertRaises(ValueError):
+            runner.validate_payload(self.valid_payload(), 128, 3, "strings")
+
+    def test_string_payload_rejects_incomplete_or_changed_contract(self):
+        corruptions = {
+            "row": lambda p: p["rows"].pop(),
+            "arm": lambda p: p["rows"][0].update(strategy="other"),
+            "duplicate": lambda p: p["rows"].__setitem__(-1, p["rows"][0]),
+            "trial": lambda p: p["rows"][0]["trials"].pop(),
+            "trial-index": lambda p: p["rows"][0]["trials"][0].update(index=True),
+            "order": lambda p: p["rows"][0]["trials"][0].update(orderIndex=3),
+            "zero": lambda p: p["rows"][0]["trials"][0].update(elapsedNanoseconds=0),
+            "nonfinite": lambda p: p["rows"][0]["trials"][0].update(nanosecondsPerOperation=float("inf")),
+            "division": lambda p: p["rows"][0]["trials"][0].update(nanosecondsPerOperation=3),
+            "checksum": lambda p: p["rows"][0]["trials"][0].update(checksum=101),
+            "equivalence": lambda p: p["rows"][1]["trials"][0].update(checksum=101, expectedChecksum=101),
+            "flag": lambda p: p["rows"][0]["trials"][0].update(resultsValidated=False),
+            "count": lambda p: p["rows"][1]["diagnostics"].update(hits=127),
+            "measurement": lambda p: p["rows"][1]["diagnostics"].update(measurementCount=1),
+            "mutation": lambda p: p["rows"][5]["diagnostics"].update(misses=0),
+            "eviction": lambda p: p["rows"][9]["diagnostics"].update(evictionObserved=False),
+            "phase": lambda p: p["costDiagnostics"].pop(),
+            "phase-trial": lambda p: p["costDiagnostics"][0]["trials"].pop(),
+            "phase-timing": lambda p: p["costDiagnostics"][0]["trials"][0].update(elapsedNanoseconds=-1),
+            "phase-checksum": lambda p: p["costDiagnostics"][0]["trials"][0].update(checksum="NaN", expectedChecksum="NaN"),
+            "phase-order": lambda p: p["phaseOrder"].reverse(),
+            "phase-boundary": lambda p: p["costDiagnostics"][0].update(timingBoundary="other"),
+            "representation": lambda p: p["representations"].pop(),
+            "representation-identity": lambda p: p["representations"][0].update(strategy="direct"),
+            "representation-length": lambda p: p["representations"][0].update(utf8Length=1),
+            "representation-raw-flag": lambda p: p["representations"][0].update(rawUIKitIsContiguousUTF8="false"),
+            "representation-source-flag": lambda p: p["representations"][0].update(sourceIsContiguousUTF8=None),
+            "restored-result": lambda p: p["rows"][4]["diagnostics"].update(restoredResultValidated=False),
+            "distinct-heights": lambda p: p["rows"][4]["diagnostics"].update(distinctHeightsObserved=False),
+            "representation-flag": lambda p: p["representations"][0].update(isContiguousUTF8=1),
+        }
+        for corruption, mutate in corruptions.items():
+            payload = self.valid_string_payload()
+            mutate(payload)
+            with self.subTest(corruption=corruption), self.assertRaises(ValueError):
+                runner.validate_payload(payload, 128, 9, "strings")
+
+    def test_both_suites_route_only_their_selected_test_and_attachment(self):
+        for suite, (selected_test, attachment_name) in runner.SUITES.items():
+            with self.subTest(suite=suite), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                attachment = {"suggestedHumanReadableName": attachment_name, "deviceId": "device",
+                              "isAssociatedWithFailure": False, "exportedFileName": "payload.json"}
+                manifest = [{"testIdentifier": selected_test + "()", "attachments": [attachment],
+                             "testIdentifierURL": "test://com.apple.xcode/DerivedKeys/" + selected_test}]
+                (directory / "payload.json").write_text('{"ok": true}')
+                def write_manifest():
+                    (directory / "manifest.json").write_text(json.dumps(manifest))
+                write_manifest()
+                self.assertEqual(runner.read_attachment(directory, "device", suite)[0], {"ok": True})
+                attachment["suggestedHumanReadableName"] = (Path(attachment_name).stem
+                    + "_0_32176F42-F0F5-4CE2-B6BC-F6E467807E5E.json")
+                write_manifest()
+                runner.read_attachment(directory, "device", suite)
+                other_suite = "strings" if suite == "sizing" else "sizing"
+                with self.assertRaises(ValueError):
+                    runner.read_attachment(directory, "device", other_suite)
+                attachment["suggestedHumanReadableName"] = runner.SUITES[other_suite][1]
+                write_manifest()
+                with self.assertRaises(ValueError):
+                    runner.read_attachment(directory, "device", suite)
+                attachment["suggestedHumanReadableName"] = attachment_name
+                manifest[0]["attachments"].append(attachment.copy())
+                write_manifest()
+                with self.assertRaises(ValueError):
+                    runner.read_attachment(directory, "device", suite)
+
+    def test_strings_suite_rejects_nonfixed_parameters_before_any_device_work(self):
+        for arguments in (("--iterations", "129"), ("--trials", "3")):
+            with self.subTest(arguments=arguments), mock.patch("sys.argv", ["run-uikit.py", "--suite", "strings", *arguments]), \
+                    mock.patch("sys.stderr"), mock.patch.object(runner, "simulator_tools") as support:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+                self.assertEqual(error.exception.code, 2)
+                support.assert_not_called()
+
+    def test_json_rejects_duplicate_keys_and_nonfinite_constants(self):
+        for text in ('{"x":1,"x":2}', '{"x":NaN}', '{"x":Infinity}', '{"x":-Infinity}'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                runner.strict_json(text)
 
 
 if __name__ == "__main__":
