@@ -22,9 +22,9 @@ This example assumes the label's other measurement settings are fixed. Select ev
 
 ## Compose child measurements
 
-Pass child caches in `children:` when creating a parent. A parent hit skips its calculation and every child result lookup. A parent miss runs the configured calculation, where child results can independently hit. Transform proposals in the calculation and declare any values that affect the transformation. Children key the actual proposals they receive. All declared children participate in the dependency snapshot even when a branch will not measure them.
+Pass child caches in `children:` when creating a parent. A parent hit skips its calculation and every child result lookup. A parent miss runs the configured calculation, where each child lookup can independently hit. Transform proposals in the calculation and declare any values that affect the transformation. Children key the actual proposals they receive. All declared children participate in the dependency snapshot even when a branch will not measure them.
 
-Use ``SizeDependencies/at(_:)`` for a child with a different root type. The descriptor retains the child's immutable dependency-reading recipe, without copying results or retaining child result storage. Call the original child with the mapped root in the parent calculation. Preserve those handles in the closure's captures. The graph is immutable and acyclic by construction; its snapshot depth is checked against ``SizeDependencies/maximumDepth``. Distinct root bindings are traversed independently.
+Use ``SizeDependencies/at(_:)`` for a child with a different root type. The descriptor retains the child's immutable dependency-reading recipe, without copying results or retaining child result storage. Call the original child with the mapped root in the parent calculation. Capture those handles in the closure. The graph is immutable and acyclic by construction; its snapshot depth is checked against ``SizeDependencies/maximumDepth``. Distinct root bindings are traversed independently.
 
 ## Ownership and completeness
 

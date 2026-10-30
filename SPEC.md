@@ -139,7 +139,7 @@ When all captured dependency values return to their previous values, the evaluat
 
 ## 6. Generic cache contract
 
-Supply a small generic reference cache to demonstrate consumption of the keys. Its key and result types must be independent of UI frameworks.
+Supply a small generic reference implementation of a cache to demonstrate how the keys are used. Its key and result types must be independent of UI frameworks.
 
 A suitable API shape is:
 
@@ -203,17 +203,17 @@ Same-root children pass directly; `child.at(keyPath)` maps a nonoptional nested 
 
 Keys contain full type-preserving dependency values and ordered recursive structure, the cache's own measurement scope, and both effective proposal dimensions. Snapshot selection never measures, consults result storage, or substitutes child sizes. Every declared child participates even when hidden. Parents select all variable inputs to proposal transformations, branches, and combination; transforms remain solely in calculations, and each invoked child keys its actual proposal.
 
-Proposals are nonthrowing validated boundaries: finite nonnegative axes including greatest finite magnitude, normalized signed zero, no silent rounding, and the identical normalized proposal sent to measurement. Invalid axes, negative capacity, excessive depth, and same-cache measurement reentry fail descriptive preconditions. Existing generic throwing APIs retain their error behavior.
+Validate proposals without throwing: accept finite nonnegative axes, including greatest finite magnitude, normalize signed zero, and pass the same normalized proposal to measurement without silent rounding. Invalid axes, negative capacity, excessive depth, and same-cache measurement reentry fail descriptive preconditions. Existing generic throwing APIs retain their error behavior.
 
-Each facade uses the existing bounded LRU, with local count/capacity/removal/clearing and capacity-zero semantics. Parent hits skip their calculation and child result lookups; parent misses may reuse child entries. Child clearing or eviction does not alter semantic dependencies and therefore does not invalidate retained parent results. Clearing a parent clears only its entries. Do not share one mutating value cache across recursive recipes or hold overlapping accesses; guard same-cache reentry before storage access.
+Each facade uses the existing bounded LRU, with its own count, capacity, removal, clearing, and capacity-zero behavior. Parent hits skip their calculation and child result lookups; parent misses may reuse child entries. Child clearing or eviction does not alter semantic dependencies and therefore does not invalidate retained parent results. Clearing a parent clears only its entries. Do not share one mutating value cache across recursive recipes or hold overlapping accesses; guard same-cache reentry before storage access.
 
-Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership and owns UIKit scheduling and outer-frame assignment.
+Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership. It also schedules UIKit layout and assigns the outer frame.
 
 Validate heterogeneous/nested/zero dependencies, selected/unselected changes, both dimensions and normalization, transformed child proposals, parent-only and child-only changes, parent hits skipping child recency, three levels, all binding forms, root release, recipe scope, collisions, bounded eviction, zero capacity, independent clearing, and existing generic semantics. Compile real UIKit key paths at iOS 16 with Swift 6.4, test diagnostics in isolated processes, and measure snapshot, warm parent, parent miss with warm children, cold composed, and equivalent direct costs using the existing benchmark harness.
 
 ### 8b. Explicit layout caching
 
-Vend a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
+Provide a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
 
 Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
 

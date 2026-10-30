@@ -1,6 +1,6 @@
 # UIKit sizing benchmarks
 
-These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Start with the [sizing and composition results](UIKit-Results.md), then the [UIKit versus model string results](String-Results.md) for the text-view lookup investigation. Both reports contain Simulator measurements. The [synthetic diagnostics](Synthetic.md) remain available to investigate key and storage costs separately.
+These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Start with the [sizing and composition results](UIKit-Results.md), then the [UIKit versus model string results](String-Results.md) for the text-view lookup investigation. Both reports contain Simulator measurements. Use the [synthetic diagnostics](Synthetic.md) to investigate key and storage costs separately.
 
 A cache hit still reads dependencies and hashes and compares their snapshots. It helps when that work costs less than the measurement it avoids, often enough to cover misses and eviction. Fewer measurement calls alone do not establish a speedup.
 
@@ -12,7 +12,7 @@ Select the package's Xcode 27.1 / Swift 6.4 toolchain. With no destination, the 
 python3 Benchmarks/run-uikit.py
 ```
 
-An explicit Simulator destination is also supported. Explicit destinations are preserved. The runner builds the actual package in **Release**, disables code coverage and parallel testing, then runs one XCTest case from `DerivedKeysUIExampleTests`. No app product or dependency is added to the package. The test's ordinary non-benchmark invocation exercises a small correctness trace instead of skipping the test.
+You can also supply an explicit Simulator destination; the runner preserves it. The runner builds the actual package in **Release**, disables code coverage and parallel testing, then runs one XCTest case from `DerivedKeysUIExampleTests`. No app product or dependency is added to the package. Outside a benchmark run, the test exercises a small correctness trace instead of skipping.
 
 The runner accepts physical-device destinations and local signing arguments, but the current package scheme uses tool-hosted tests. Xcode 27.1 rejected device execution because it requires a host application. A connected-device build succeeded; no device timings were collected. Running this fixture on hardware requires an app-hosted test target, which this repository does not currently provide. The runner does not enable provisioning updates.
 
@@ -24,9 +24,9 @@ Run the focused string-representation comparison with:
 python3 Benchmarks/run-uikit.py --suite strings
 ```
 
-This suite fixes 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation. The following workload description covers the default sizing suite.
+This suite uses a fixed 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation. The following workload description covers the default sizing suite.
 
-The output includes the raw XCTest result, JSON attachment, commands, toolchain and destination metadata, candidate source fingerprints, and a receipt. Missing tests, failed comparisons, incomplete observations, and source changes during execution fail the runner. Its parser controls are available with:
+The output includes the raw XCTest result, JSON attachment, commands, toolchain and destination metadata, candidate source fingerprints, and a receipt. The runner fails if tests are missing, comparisons fail, observations are incomplete, or source files change during execution. Its parser controls are available with:
 
 ```sh
 python3 Benchmarks/test-run-uikit.py
@@ -62,7 +62,7 @@ Prepared strings, standalone fonts, immutable attributed inputs, request traces,
 
 Warm and equivalent-view rows are **measurement-only**: controls are configured before timing. Direct document measurements retain the configured controls and call their UIKit fitting methods without reassigning their content in the loop. This preserves UIKit's own warm behavior.
 
-Changing rows include the applicable configuration work in both arms. A width change updates the proposal; a spacing change assigns spacing; content/font changes assign the same prepared values. Document measurements use the example's synchronized getters when requesting a child. Their cost is therefore part of those rows. The parent-only row changes no child input, though a direct measurement still performs the example's child access and fitting.
+Changing rows include the applicable configuration work in both arms. A width change updates the proposal; a spacing change assigns spacing; content/font changes assign the same prepared values. Document measurements use the example's synchronized getters when requesting a child. Those rows include the getters' cost. The parent-only row changes no child input, though a direct measurement still performs the example's child access and fitting.
 
 Each trial creates independent direct and cached fixture sets. Warmup primes the cached entry before the final direct UIKit warmup, so synchronizing the example controls does not accidentally invalidate the direct baseline afterward. There are four direct warmup calls per warmed view; equivalent-view rows warm only their separate seed. Arm order alternates between trials. Both arms write their returned sizes into preallocated buffers; comparison, diagnostics, serialization, and attachment creation occur afterward. Loop and timer overhead are not subtracted.
 
@@ -92,7 +92,7 @@ Explicitly making the UIKit string contiguous on every request improved that war
 
 If full-content hashing remains a bottleneck after that comparison, an optional compact semantic projection can reduce hashing work: a content identity together with a reliable revision that changes whenever any size-relevant content changes. Select existing identity and revision properties directly, or a computed immutable snapshot property when useful. The revision contract belongs to the application; identity alone cannot represent edits, and a revision that misses changes makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. Typography and other independent layout inputs still need their own dependencies.
 
-Profile the application's actual hit rate, content, and fitting methods before choosing this projection. A small view with an inexpensive warm UIKit fit may be better served by direct measurement or one stored result. The [README](../README.md) keeps the convenient sizing and recursive reuse API in view.
+Profile the application's actual hit rate, content, and fitting methods before choosing this projection. A small view with an inexpensive warm UIKit fit may be better served by direct measurement or one stored result. See the [README](../README.md) for the sizing and recursive reuse API.
 
 ## Synthetic diagnostics
 

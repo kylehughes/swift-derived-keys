@@ -4,7 +4,7 @@ Add the `DerivedKeysUIKit` product to your app target and import it alongside UI
 
 ## Capture one request
 
-`LayoutCache<Operation, Input, Context, Value>` is a main-actor reference type. Declare a distinct operation enum for each layout algorithm, capture its content in a `Hashable` input, and capture any consumed environment in a `Hashable` context. The result can be `CGSize` or an immutable structure containing all the frames and sizes your view needs.
+`LayoutCache<Operation, Input, Context, Value>` is a main-actor reference type. Declare a distinct operation enum for each layout algorithm, capture its content in a `Hashable` input, and capture any environment values the algorithm reads in a `Hashable` context. The result can be `CGSize` or an immutable structure containing all the frames and sizes your view needs.
 
 ```swift
 import DerivedKeysUIKit
@@ -55,7 +55,7 @@ let first = LabelView(text: "Shared content", cache: cache)
 let second = LabelView(text: "Shared content", cache: cache)
 ```
 
-The [full source](../Sources/DerivedKeysUIExample/LabelView.swift) includes this initializer and calculation counters. Two views with equal captured inputs and proposals can share a result without including view identity. A reused view with changed text requests a different entry. Returning from A to B to A can reuse A while its entry remains retained.
+The [full source](../Sources/DerivedKeysUIExample/LabelView.swift) includes this initializer and calculation counters. Two views with equal captured inputs and proposals can share a result without including view identity. A reused view with changed text requests a different entry. Changing inputs from A to B and back to A can reuse A's result while its entry remains retained.
 
 Use `key(for:proposal:context:)` when composing child layouts. It returns `LayoutKey`, a core `RequestKey` whose `LayoutInputs` contain the complete input and proposal. Store complete child keys in the parent's hashable input alongside parent-only values, rather than composing hash integers or measured sizes. Distinct operation types and the cache's fixed `version` separate algorithms. The [text/button demonstration](Text-Component.md) illustrates independently cached children and an optional child dependency.
 

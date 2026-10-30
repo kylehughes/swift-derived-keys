@@ -33,7 +33,7 @@ func example() throws {
 ```
 
 Keep the measurer alive across requests to retain its caches. Capture a coherent
-snapshot within the model's mutation owner. The main-actor API does not suspend,
+snapshot in the code that owns model mutation. The main-actor API does not suspend
 and uses the same snapshot for both key formation and calculation. It does not
 retain a model, callback, provider, or view.
 
@@ -51,8 +51,8 @@ plain-text shaping and `sizeThatFits`; the font environment is process-local.
 The button child key contains its title, font, style, effective inner bounds, and
 display scale. Its single-line title truncates at the tail. `plain` adds no
 content insets; `padded` adds 12 points on each horizontal side and 6 on each
-vertical side. Style here is this explicit metric policy, not UIButton's ambient
-configuration or a paint style.
+vertical side. Here, style controls these measurements; it does not use UIButton's
+ambient configuration or a paint style.
 
 The parent key contains the complete text child key, the optional button child
 key, padding, visible-button spacing, outer proposal, and context. Hidden buttons

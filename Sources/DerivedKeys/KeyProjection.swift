@@ -1,6 +1,6 @@
 /// A reusable selection of the inputs that affect one operation.
 ///
-/// Capture an input snapshot once, then use it both here and for calculation.
+/// Capture an input snapshot once, then use it for both projection and calculation.
 /// Projection is synchronous and runs when ``key(for:context:version:)`` is called.
 /// It must be a side-effect-free read and must not suspend or recursively evaluate
 /// itself. Actor-owned clients capture their state within that actor's isolation.

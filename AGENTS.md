@@ -1,6 +1,6 @@
 # DerivedKeys
 
-DerivedKeys separates dependency selection, immutable semantic keys, and synchronous bounded LRU reuse. Read [README.md](README.md) for public behavior and [maintenance](Documentation/Maintenance.md) for checks; [SPEC.md](SPEC.md) owns the implementation requirements.
+DerivedKeys separates dependency selection, immutable semantic keys, and synchronous bounded LRU reuse. Read [README.md](README.md) for public behavior and [maintenance](Documentation/Maintenance.md) for checks; [SPEC.md](SPEC.md) defines the implementation requirements.
 
 ## Package boundaries
 
@@ -9,11 +9,11 @@ DerivedKeys separates dependency selection, immutable semantic keys, and synchro
 - `DerivedKeysUIKit` is the supported fitting and layout-cache product. Its main-actor reference cache automatically keys the effective fitting proposal; captured inputs and result values remain caller-owned semantic contracts.
 - `DerivedKeysUIExample` is a non-product target containing tested frame-layout and text/button examples. See [the sizing guide](Examples/Size-Caches.md) for fitting, cache sharing, and application layout responsibilities.
 - `DocumentExportExample` is a runnable non-UI consumer. [UIKit benchmarks](Benchmarks/README.md) compare real sizing paths; `DerivedKeysBenchmarks` retains synthetic key and cache diagnostics.
-- Swift tools 6.4, Swift 6 mode, macOS 13/iOS 16 minima, and warnings as errors are declared in `Package.swift`. Preserve those axes separately.
+- Swift tools 6.4, Swift 6 mode, macOS 13/iOS 16 minima, and warnings as errors are declared in `Package.swift`. Preserve each requirement separately.
 
 ## Key and storage contracts
 
-Keys retain complete values and structure, not hashes alone. Never weaken concrete type or operation separation. Hashable values can still have mutable aliases; callers must project stable values. Source identity is only request-local memoization identity. Sources are not Hashable or Sendable. Immutable graph edges and checked depth bound recursive evaluation. Cache entries must not retain providers or calculation closures. Keep optional nil hits, failed-computation noninsertion, LRU order, and copy independence covered.
+Keys retain complete values and structure, not hashes alone. Never weaken concrete type or operation separation. Hashable values can still have mutable aliases; callers must project stable values. Source identity is only request-local memoization identity. Sources are not Hashable or Sendable. Immutable graph edges and checked depth bound recursive evaluation. Cache entries must not retain providers or calculation closures. Keep optional nil hits, noninsertion after failed calculations, LRU order, and copy independence covered.
 
 ## Implementation and checks
 

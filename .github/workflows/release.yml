@@ -37,7 +37,7 @@ jobs:
       timeout-minutes: 15
       run: |
         python3 -I - <<'PY'
-        # This source is embedded inline into the workflow; never executed from an artifact.
+        # This workflow embeds the source below; never execute it from an artifact.
         import hashlib
         import json
         import os
@@ -288,7 +288,7 @@ jobs:
       timeout-minutes: 15
       run: |
         python3 -I - <<'PY'
-        # This source is embedded inline into the workflow; never executed from an artifact.
+        # This workflow embeds the source below; never execute it from an artifact.
         import hashlib
         import json
         import os

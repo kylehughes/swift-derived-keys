@@ -45,7 +45,7 @@ The Documentation workflow responds to GitHub's [`public` event](https://docs.gi
 
 The deployment job consumes only its own run's `documentation-site` artifact. Before publishing, it checks the repository's current visibility, the configured Pages URL, and that the built commit is still the head of `main`. It does not change repository visibility. If an older run is superseded, use the current commit's run instead of publishing the old artifact.
 
-The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After the first public deployment, verify that entry, all three module pages, and their navigation and assets. A successful private build establishes artifact readiness; it cannot establish a live deployment.
+The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After the first public deployment, verify that entry, all three module pages, and their navigation and assets. A successful private build verifies the documentation artifact; live deployment needs a separate check.
 
 To rebuild and deploy the current public `main` manually:
 

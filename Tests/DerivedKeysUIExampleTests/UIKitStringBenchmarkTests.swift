@@ -175,7 +175,7 @@ private enum StringContent: String, CaseIterable {
             base = String(repeating: "Long text includes punctuation, dates, and several measured lines. ", count: 24)
         case .longNonASCII: base = String(repeating: "Café résumé 日本語 中文 👩🏽‍💻 🌍. ", count: 32)
         }
-        // Ordinary native Swift construction; the model arm never repairs storage representation.
+        // Construct native Swift strings; the model arm never repairs their storage representation.
         return (0 ..< 40)
             .map { index in
                 base + " Variant \(index)." + String(repeating: " Extra wrapping content.", count: index % 8 * 4)
@@ -375,7 +375,7 @@ private final class StringFixture {
 
     func costs(content: StringContent, iterations: Int, trials: Int) -> [StringCostRow] {
         let first = cache.snapshot(of: root)
-        // Read each slot outside the hash phase; no normalization or getter is hidden in that phase.
+        // Read each slot before the hash phase, which includes no normalization or getter calls.
         let preRead = (0 ..< 64).map { _ in readText() }
         let preconstructed = (0 ..< 64).map { _ in cache.snapshot(of: root) }
         var rows: [StringCostRow] = []

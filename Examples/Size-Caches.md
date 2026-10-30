@@ -1,6 +1,6 @@
 # Composing size caches
 
-Import `DerivedKeysUI` to bind key-path dependencies and a measurement closure in a retained `SizeCache`. The [README](../README.md) starts with a single measurement and composes a text/button layout. The [complete application fixture](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a controller that assigns frames. These application types are examples, not requirements imposed by the library.
+Import `DerivedKeysUI` to bind key-path dependencies and a measurement closure in a retained `SizeCache`. The [README](../README.md) starts with a single measurement and composes a text/button layout. The [complete application fixture](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a controller that assigns frames. These are example application types; the library does not require them.
 
 ## Map a child root
 
@@ -46,7 +46,7 @@ The parent keys its own proposal and recursively captured dependency values. Chi
 
 The document example measures inner content at `max(0, outerWidth - 2 * padding)` and unconstrained height. Changing spacing changes only the parent key. Changing padding also changes the child's actual width. Changing the outer height changes the parent request even though this example chooses natural height; its unchanged child proposals can still hit.
 
-Both proposal axes must be finite and nonnegative. `CGFloat.greatestFiniteMagnitude` denotes an unconstrained axis; infinity is rejected. Signed zero becomes positive zero in both key and callback proposal. No dimension quantization occurs. Size results remain the recipe's policy, including any rounding or clamping.
+Both proposal axes must be finite and nonnegative. `CGFloat.greatestFiniteMagnitude` denotes an unconstrained axis; infinity is rejected. Signed zero becomes positive zero in both key and callback proposal. Dimensions are not quantized. The recipe controls result sizing, including any rounding or clamping.
 
 ## Keep ownership explicit
 
@@ -58,7 +58,7 @@ Descriptions retain dependency readers only. A descriptor from `child.at(\.title
 
 ## Capture stable values
 
-A key path to a `Hashable` class can still return a mutable alias. Prefer a value snapshot, such as a computed `measurementContent` property returning immutable text and style data, and select `\.measurementContent`. Do not use a document ID alone to represent edits under the same ID. The core's explicit projections and snapshots remain available for more involved value selection.
+A key path to a `Hashable` class can still return a mutable alias. Prefer a value snapshot, such as a computed `measurementContent` property returning immutable text and style data, and select `\.measurementContent`. Do not use a document ID alone to represent edits under the same ID. Use the core's explicit projections and snapshots for more complex value selection.
 
 ### Select authoritative model text
 
@@ -91,11 +91,11 @@ If full-content hashing still dominates, an optional compact projection is the c
 
 Selection and calculation are synchronous on the main actor. Keep selected values and any other result-relevant state consistent throughout the request. Dependency getters should read values without mutation, I/O, or recursive evaluation. A hit still reads all declared dependencies and hashes/compares their full snapshots, but does not invoke measurements or consult child result storage. `snapshot(of:)` exposes the dependency snapshot for inspection; it excludes proposal and recipe identity and is not a standalone complete result key.
 
-The immutable graph cannot be cycled through public construction. Its limit is 64 snapshot nodes per path, counting value leaves and composition boundaries. Mapping adds no boundary. An empty cache has depth one; a cache selecting a property has depth two; a parent adds one. Excess depth fails a descriptive precondition. Same-cache measurement reentry, including result inspection/removal through an alias, also fails a precondition; nesting different caches is supported.
+Public construction cannot create a cycle in the immutable graph. Its limit is 64 snapshot nodes per path, counting value leaves and composition boundaries. Mapping adds no boundary. An empty cache has depth one; a cache selecting a property has depth two; a parent adds one. Excess depth fails a descriptive precondition. Same-cache measurement reentry, including result inspection/removal through an alias, also fails a precondition; nesting different caches is supported.
 
 ## Integrate with UIKit layout
 
-Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes its text and category-only font settings before a direct leaf measurement; it schedules layout when content or category changes. The controller still owns refitting and assigning the container frame.
+Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes its text and category-only font settings before a direct leaf measurement; it schedules layout when content or category changes. The controller remains responsible for refitting and assigning the container frame.
 
 ## Choose a lower-level result API
 

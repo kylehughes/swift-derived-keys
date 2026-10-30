@@ -6,7 +6,7 @@ Reuse complete UIKit layout results from captured inputs and fitting proposals.
 
 This module provides the explicit-input API for arbitrary complete layout results. For a key-path sizing API with configured measurement closures and recursive child caches, use the separate `DerivedKeysUI` product.
 
-A frame-based view often calculates the same layout while answering a fitting request and assigning child frames. Retain a ``LayoutCache`` on the main actor and cache an immutable result containing the fitted size and frames. The same cache can be explicitly shared across views running the same algorithm.
+A frame-based view often calculates the same layout while answering a fitting request and assigning child frames. Retain a ``LayoutCache`` on the main actor and cache an immutable result containing the fitted size and frames. Views running the same algorithm can explicitly share the cache.
 
 ## Capture inputs and fitting proposals
 

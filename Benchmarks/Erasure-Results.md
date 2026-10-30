@@ -1,6 +1,6 @@
 # Concrete dependency erasure
 
-The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. This repairs an internal bottleneck; it does not establish that caching is always useful. The [UIKit results](UIKit-Results.md) are the primary application evidence.
+The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. The change removes an internal bottleneck, but does not establish that caching is always useful. See the [UIKit results](UIKit-Results.md) for measurements of application sizing.
 
 ## What changed
 
@@ -22,7 +22,7 @@ Values are **median [minimum–maximum] microseconds per operation** across five
 | Shared source: snapshot hashing | 838.33 [830.54–863.37] | 77.65 [76.63–81.47] | 0.093× |
 | Shared source: warm lookup | 2,650.31 [2,644.23–2,678.66] | 79.71 [78.57–80.85] | 0.030× |
 
-The shared-source graph uses one payload in two structural branches. Its hashing and warm lookup improve, while snapshot capture alone becomes slightly more expensive in this sample. Capturing does not hash the contents; reducing erased hashing and equality is where the substantial gain appears.
+The shared-source graph uses one payload in two structural branches. Its hashing and warm lookup improve, while snapshot capture alone becomes slightly more expensive in this sample. Capture does not hash the contents; the substantial gain appears in the cost of erased hashing and equality.
 
 The size graph contains a parent and two children. A warm parent hits one unchanged request. The direct diagnostic uses the same child math with varying input variants, as does the cold trace; it is a separate cost diagnostic, not an identical request trace to the warm-parent case. Warm-parent lookup remains about twice as costly as that direct calculation.
 
@@ -32,7 +32,7 @@ The size graph contains a parent and two children. A warm parent hits one unchan
 | Parent miss, warm children | 488.07 [471.29–506.08] | 1,000 / 0 / 0 |
 | Cold composed request | 865.17 [843.17–889.81] | 1,000 / 1,000 / 1,000 |
 
-The parent-miss trace changes spacing while retaining the child inputs and proposals. It avoids child calculation but pays for parent and child snapshots and lookups plus parent insertion. The cold trace changes both children and pays for the complete cache path and calculation. Both fill and evict bounded storage. Warm parent calculations are 0 / 0 / 0 after one warmup calculation per cache. The direct trace performs 1,000 calculations at every level; cold and direct checksums match. Counts and result checks are enforced by the existing executable.
+The parent-miss trace changes spacing while retaining the child inputs and proposals. It avoids child calculation but still captures and looks up parent and child snapshots and inserts the parent result. The cold trace changes both children and pays for the complete cache path and calculation. Both fill and evict bounded storage. Warm parent calculations are 0 / 0 / 0 after one warmup calculation per cache. The direct trace performs 1,000 calculations at every level; cold and direct checksums match. Counts and result checks are enforced by the existing executable.
 
 ## Reproduce and interpret
 

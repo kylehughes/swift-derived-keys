@@ -53,7 +53,7 @@ public final class DocumentSizeCaches {
     }
 }
 
-/// A reusable plain UIKit view whose screen injects its measurement caches.
+/// A reusable plain UIKit view with measurement caches injected by its screen.
 ///
 /// Fitting fills the proposed width and computes an unconstrained height. Padding and
 /// spacing must be finite and nonnegative. The parent owns refitting and assigning the

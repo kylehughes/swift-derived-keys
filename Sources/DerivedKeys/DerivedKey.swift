@@ -3,7 +3,7 @@
 /// Use a small `Hashable` struct, an ordered array, or ``KeyPair`` for children.
 /// Child structure and concrete types are part of equality. A derived key is
 /// distinct from an ``OriginalKey`` even when their labels and values match.
-/// Hashing and equality cost as much as the inspected child values.
+/// The cost of hashing and equality depends on the child values they inspect.
 public struct DerivedKey<Children>: Hashable where Children: Hashable {
     /// The captured children, retaining their own equality semantics.
     public let children: Children

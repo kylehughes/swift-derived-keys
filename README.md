@@ -13,11 +13,11 @@ Use `DerivedKeysUI` for view sizing. For computations without UI, start with the
 
 ## Sizing views
 
-Create caches once in a retained main-actor owner. The walkthrough builds one measurement, combines it with another, then [injects the caches into a view](#choose-ownership).
+Create caches once in a retained main-actor owner. The walkthrough starts with one measurement, combines it with another, then [injects the caches into a view](#choose-ownership).
 
 ### Cache one measurement
 
-`DocumentContentView` below is an application type. Its `content` is a stable `Hashable` value—in the [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift), a `String`. `isExpanded` controls the line limit. The example fixes typography rules and the button title, and explicitly selects Dynamic Type. Additional variable measurement inputs need additional dependencies.
+`DocumentContentView` below is an application type. Its `content` is a stable `Hashable` value—in the [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift), a `String`. `isExpanded` controls the line limit. The example fixes typography rules and the button title, and explicitly selects Dynamic Type. Declare any other inputs that can change measurement as dependencies.
 
 The example selects the application's stored content. If a separate model owns the text, select a key path such as `\.model.text`; the [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit.
 
@@ -37,11 +37,11 @@ let textSizes = SizeCache<DocumentContentView>(
 let size = textSizes.size(of: view, toFit: availableSize)
 ```
 
-The initializer binds the selected properties and measurement recipe. A lookup reads their current values and automatically includes **both fitting dimensions** in the key. It returns a retained result when that complete request matches. The root view is not part of the key, so different views can reuse a result through the same cache. Neither the view nor its properties need to be `Sendable`; selected values must be `Hashable` and stable.
+The initializer binds the selected properties and measurement recipe. A lookup reads their current values and automatically includes **both fitting dimensions** in the key. It returns a cached result when the full request matches a stored entry. The root view is not part of the key, so different views can reuse a result through the same cache. Neither the view nor its properties need to be `Sendable`; selected values must be `Hashable` and stable.
 
 Use finite, nonnegative proposal dimensions; `CGFloat.greatestFiniteMagnitude` is supported for an unconstrained axis. See [fitting proposals](#fitting-proposals) for validation and normalization rules. A cache hit skips the recipe, so side effects that must run on every request belong outside it.
 
-For a small view with one remembered size, an ordinary request struct and stored result may suffice. These APIs provide declared dependency composition and bounded reuse across several input states. Caching still pays for snapshot selection, hashing, and equality; it is not universally faster than direct measurement. The [UIKit sizing benchmarks](Benchmarks/README.md) compare warm views, shared results, and changing layouts.
+For a small view with one remembered size, an ordinary request struct and stored result may suffice. These APIs let you compose dependencies and retain results for several input states within a fixed capacity. Caching still pays for snapshot selection, hashing, and equality; it is not universally faster than direct measurement. The [UIKit sizing benchmarks](Benchmarks/README.md) compare warm views, shared results, and changing layouts.
 
 ### Compose a layout
 
@@ -86,11 +86,11 @@ let edited = contentSizes.size(of: view, toFit: availableSize) // Parent and tex
 
 The calculation captures the same child handles declared in `children:`. A parent hit skips its calculation and all child result lookups. A parent miss executes the calculation, whose child lookups can independently hit.
 
-Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example intentionally computes natural height from the outer width. Every declared child participates in the parent snapshot, including a hidden button, so unused-child changes may conservatively cause a parent miss.
+Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example intentionally computes natural height from the outer width. Every declared child participates in the parent snapshot, including a hidden button, so changes to an unused child can still cause a parent miss.
 
 ### Choose ownership
 
-Composition does not dictate ownership. A screen-owned bundle is a useful default when reusable views should share results. The example's application-owned `DocumentSizeCaches` constructs the two children once, constructs the parent using those same handles, and retains all three. Parent closures capture child handles rather than the bundle or a view.
+Composition does not dictate ownership. A screen-owned bundle is a useful default when reusable views should share results. In this example, `DocumentSizeCaches` creates the two child caches once, uses those same handles to create the parent, and retains all three. Parent closures capture child handles rather than the bundle or a view.
 
 ```swift
 @MainActor

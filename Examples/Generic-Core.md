@@ -26,11 +26,11 @@ let input = ExportInput(text: "Hello", uppercase: true)
 let key = projection.key(for: input, context: "plain-text")
 ```
 
-Keep every value's equality and hashing stable for the lifetime of a key. `Hashable` does not ensure immutability: copying a mutable class reference is not a snapshot. Project its content into immutable values instead. A content ID alone cannot describe edits under that ID; a revision is sufficient only with complete mutation coverage, a unique content identity, and a non-reuse contract.
+Keep every value's equality and hashing stable for the lifetime of a key. `Hashable` does not ensure immutability: copying a mutable class reference is not a snapshot. Project its content into immutable values instead. A content ID alone cannot describe edits under that ID. A revision is sufficient only if it covers every relevant mutation, is paired with a unique content identity, and the pair is not reused for different content while entries may remain.
 
 ### Runtime composition and live reads
 
-`KeySource<Input>` is an immutable graph recipe. Providers run when `snapshot(for:)` is called. Sources are deliberately not dictionary keys; `DependencySnapshot` is the evaluated key material.
+`KeySource<Input>` is an immutable graph recipe. Providers run when `snapshot(for:)` is called. Sources are deliberately not dictionary keys; `DependencySnapshot` contains the evaluated values and structure used in keys.
 
 ```swift
 let text = KeySource<ExportInput>("text") { $0.text }
@@ -68,6 +68,6 @@ Typed keys and caches are `Sendable` only when their stored values are. Dynamic 
 
 ## Account for cache costs
 
-Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. Use reusable immutable projections at controlled content-mutation boundaries when profiling warrants it. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
+Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. When profiling warrants it, prepare reusable immutable projections where you control content changes. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
 
 See the [DocC dependency guide](../Documentation/DerivedKeys.docc/DependencyDesign.md) for the full ownership and equality contract.

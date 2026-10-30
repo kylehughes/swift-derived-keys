@@ -2,7 +2,7 @@
 
 This sample records one run of the [benchmark suite](Synthetic.md#size-facade-workload-and-cases) on 2026-10-28 at 20:24 UTC. Each case ran once in a separate process. These are measurements of synthetic byte-mixing calculations through `SizeCache`, not UIKit fitting measurements or a performance guarantee.
 
-This is a historical sample. The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair. For primary application evidence, read the [UIKit results](UIKit-Results.md) and [methodology](README.md); use the [synthetic methodology](Synthetic.md) for these diagnostic cases.
+This is a historical sample. The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair. For measurements of application sizing, read the [UIKit results](UIKit-Results.md) and [methodology](README.md); use the [synthetic methodology](Synthetic.md) for these diagnostic cases.
 
 ```sh
 BENCHMARK_SCRATCH_PATH=.build/size-benchmark-build \
@@ -37,7 +37,7 @@ The times are means within each named loop, in microseconds per operation. Count
 
 Runtime checks accepted every expected calculation count. Each result-producing case also matched direct calculation over its own inputs. The cold and direct cases used identical changing child variants and both produced checksum `23092887143`. Parent misses changed only spacing; child variants and effective proposals stayed fixed, so every child request hit its warmed entry.
 
-The warmed parent avoided all measurement calls but took longer than direct calculation in this sample. Capturing a snapshot alone was much cheaper than the warmed lookup. The lookup additionally hashes and compares complete payload-valued dependency snapshots, and the cold path also inserts and evicts across three caches. These rows do not isolate a precise cost for hashing, equality, type erasure, or LRU bookkeeping. They show that this cache and dependency representation did not pay off for this particular calculation. A more expensive measurement or a smaller stable projection can produce a different tradeoff; application profiling is needed to choose one.
+The warmed parent avoided all measurement calls but took longer than direct calculation in this sample. Capturing a snapshot alone was much cheaper than the warmed lookup. The lookup additionally hashes and compares complete payload-valued dependency snapshots, and the cold path also inserts and evicts across three caches. These rows do not isolate a precise cost for hashing, equality, type erasure, or LRU bookkeeping. For this calculation, the cache and dependency representation cost more than they saved. A more expensive measurement or a smaller stable projection can produce a different tradeoff; application profiling is needed to choose one.
 
 The parent-miss and cold cases used bounded capacity 128 throughout. They evicted after filling; neither used capacity equal to the 1,000 iterations. For a run without those evictions, set capacity at least equal to iterations and retain that distinction when comparing results.
 

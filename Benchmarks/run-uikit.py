@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run opt-in UIKit sizing or String timings in Release and retain a local evidence bundle.
 
-With no destination, creates and removes its own disposable iOS Simulator.
+With no destination, the runner creates and removes its own disposable iOS Simulator.
 An explicit destination must be platform=iOS,id=UDID or platform=iOS Simulator,id=UUID;
 no lifecycle commands are issued for explicit devices. Xcode installs and runs the test bundle.
 """
@@ -545,7 +545,7 @@ def main():
         receipt["actualDestination"] = {"platform": chosen["platform"], "devices": report.get("devices"),
                                          "configurations": summary.get("devicesAndConfigurations")}
         attachments = directory / "attachments"
-        # Export all attachments after proving this bundle contains exactly the requested test.
+        # Export all attachments after checking that this bundle contains exactly the requested test.
         # xcresulttool's test-id grammar differs from xcodebuild's -only-testing grammar.
         commands.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result_path),
                       "--output-path", str(attachments)], "export-attachments")

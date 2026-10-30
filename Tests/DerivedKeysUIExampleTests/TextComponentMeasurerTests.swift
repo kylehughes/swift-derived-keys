@@ -100,7 +100,7 @@ struct TextComponentMeasurerTests {
         #expect(measurer.size(for: hidden, proposal: bounds, context: context) == hiddenSize)
         #expect(measurer.key(for: hidden, proposal: bounds, context: context) == hiddenKey)
         #expect(measurer.componentCalculationCount == 3)
-        // A hidden button's title/font/style never enter the snapshot. Parent-only spacing is ignored too.
+        // A hidden button's title, font, and style never enter the snapshot. Parent-only spacing is ignored too.
         let changedHiddenSpacing = try input(spacing: 900)
         #expect(measurer.key(for: changedHiddenSpacing, proposal: bounds, context: context) == hiddenKey)
         let hiddenButtonMetrics = try ButtonMeasurementInput(

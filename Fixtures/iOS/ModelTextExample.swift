@@ -54,7 +54,7 @@ func makeArticleTextSizes() -> SizeCache<ArticleView> {
 
 @MainActor
 func modelTextExample() {
-    // Retain this handle in the application's chosen owner for subsequent requests.
+    // Retain this handle in the application's chosen owner for later requests.
     let textSizes = makeArticleTextSizes()
     let view = ArticleView(model: Article(text: "A native Swift model owns this text."))
     let proposal = CGSize(width: 180, height: CGFloat.greatestFiniteMagnitude)

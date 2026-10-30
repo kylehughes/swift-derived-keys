@@ -1,6 +1,6 @@
 # Synthetic diagnostics
 
-These release benchmarks isolate key construction, hashing, equality during lookup, and bounded storage around a synthetic calculation. Use them to investigate overhead and regressions. The [UIKit benchmarks](README.md) address application measurement; synthetic results do not establish UIKit usefulness.
+These release benchmarks isolate key construction, hashing, equality during lookup, and bounded storage around a synthetic calculation. Use them to investigate overhead and regressions. The [UIKit benchmarks](README.md) measure application sizing costs; these synthetic results do not establish whether caching helps UIKit sizing.
 
 The [concrete-erasure comparison](Erasure-Results.md) records the internal representation repair. The historical [generic release sample](Results.md) and [size-facade release sample](Size-Results.md) retain their original timings and source fingerprints.
 
@@ -32,7 +32,7 @@ Repeat runs under comparable system load and power conditions. Compare distribut
 
 ## Workload and cases
 
-The input is one immutable byte array, a relevant integer format, and an irrelevant integer UI field. The calculation reads only the bytes and format: four passes of wrapping integer mixing over the payload produce a `UInt64`. It is a synthetic CPU workload rather than an exporter or UI measurement. The format changes the result; the UI field does not.
+The input is one immutable byte array, a relevant integer format, and an irrelevant integer UI field. The calculation reads only the bytes and format: four passes of wrapping integer mixing over the payload produce a `UInt64`. This synthetic CPU workload does not measure an exporter or UI work. The format changes the result; the UI field does not.
 
 The concrete key is a `RequestKey` containing a `DerivedKey` and a `KeyPair` of labeled content and format leaves. Its context and version are fixed at zero. Payload arrays share one copy-on-write buffer within a case; generating a new format does not copy the bytes. A separate runtime-graph case measures `KeySource` and `DependencySnapshot`.
 
@@ -87,7 +87,7 @@ The generic cases retain their original JSON schema. Their memory fields describ
 | `uniquePayloadBytesReferencedByEntries` | Payload length when entries exist, otherwise zero. All entries in a case reference one byte-array buffer. |
 | `resultValueBytesAcrossEntries` | Entry count multiplied by `MemoryLayout<UInt64>.stride`. |
 
-These fields account for payload content and result values. They exclude array headers, spare allocation capacity, dictionaries, cache slots, labels, erased graph nodes, allocator overhead, and executable/runtime memory. The input also owns the shared payload, so its bytes are not exclusively attributable to the cache. The fields are not a heap census or an estimate of total retained key bytes.
+These fields account for payload content and result values. They exclude array headers, spare allocation capacity, dictionaries, cache slots, labels, erased graph nodes, allocator overhead, and executable/runtime memory. The input also owns the shared payload, so its bytes are not exclusively attributable to the cache. These fields do not describe the whole heap or estimate total retained key bytes.
 
 The size cases use a separate schema. Each `caches` entry names the parent, left child, or right child and reports `cacheCapacity`, `entryCount`, `computationCount`, and `warmupComputationCount`. `requestedCapacityPerCache` is the command-line capacity; `payloadBytesPerChild` is the payload length selected by each child. `storedResultValueBytesAcrossCaches` sums final entry counts multiplied by `MemoryLayout<CGSize>.stride`. It excludes snapshots, cache storage, closures, headers, and allocator overhead. Total retained key bytes and allocation counts are unknown.
 

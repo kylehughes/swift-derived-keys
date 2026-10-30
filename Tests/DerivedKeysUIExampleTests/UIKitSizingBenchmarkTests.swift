@@ -387,8 +387,8 @@ private final class Fixture {
         var hits = Counts()
         var misses = Counts()
         if workload.isDocument && observeMembership {
-            // Public removal/count APIs reveal membership without a parallel cache implementation.
-            // Reconstruct each prefix because probing destructively removes the inspected entry.
+            // Public removal and count APIs reveal membership without a parallel cache implementation.
+            // Reconstruct each prefix because probing removes the inspected entry.
             for index in requests.indices {
                 prepare()
                 for earlier in requests[..<index] {
@@ -454,7 +454,7 @@ private final class Fixture {
             assertBounds()
         }
         let finalEntries = entries()
-        // More observed misses than retained entries proves some inserted result was evicted.
+        // More observed misses than retained entries shows that some inserted result was evicted.
         evictionObserved =
             misses.parent > finalEntries.parent && finalEntries.parent == Self.capacity
             || misses.text > finalEntries.text && finalEntries.text == Self.capacity
@@ -518,7 +518,7 @@ private final class Fixture {
         for phase in phases {
             var trials: [CostTrial] = []
             for index in 0 ..< trialCount {
-                // Stable inputs and the same warmed view/cache; buffer allocation and uniqueness precede timing.
+                // Reuse stable inputs and the same warmed view and cache; allocate buffers and resolve uniqueness before timing.
                 var sizes = Array(repeating: CGSize.zero, count: iterations)
                 var snapshots = preconstructed
                 var texts = Array(repeating: expectedText ?? "", count: 64)
