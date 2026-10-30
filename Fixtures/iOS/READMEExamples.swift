@@ -5,44 +5,43 @@ import UIKit
 
 @MainActor
 func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
-    let textSizes = SizeCache<DocumentContentView>(
-        dependingOn: \.content,
-        \.isExpanded,
-        \.traitCollection.preferredContentSizeCategory,
+    let textSizes = SizeCache<UITextView>(
+        dependingOn: \.text,
+        \.font,
+        \.textContainer.maximumNumberOfLines,
         capacity: 256
-    ) { view, proposal in
-        view.textView.sizeThatFits(proposal)
-    }
+    )
 
-    let size = textSizes.size(of: view, toFit: availableSize)
+    let size = textSizes.size(of: view.textView, toFit: availableSize)
 
-    let buttonSizes = SizeCache<DocumentContentView>(
-        dependingOn: \.traitCollection.preferredContentSizeCategory,
+    let buttonSizes = SizeCache<UIButton>(
+        dependingOn: \.currentTitle,
+        \.titleLabel?.font,
         capacity: 256
-    ) { view, proposal in
-        view.button.sizeThatFits(proposal)
-    }
+    )
+    let text = textSizes.bound(to: \DocumentContentView.textView)
+    let button = buttonSizes.bound(to: \DocumentContentView.button)
 
     let contentSizes = SizeCache<DocumentContentView>(
         dependingOn: \.padding,
         \.spacing,
         \.showsButton,
-        children: textSizes,
-        buttonSizes,
+        children: text,
+        button,
         capacity: 256
     ) { view, proposal in
         let innerProposal = CGSize(
             width: max(0, proposal.width - 2 * view.padding),
             height: CGFloat.greatestFiniteMagnitude
         )
-        let text = textSizes.size(of: view, toFit: innerProposal)
-        let button =
+        let textSize = text.size(of: view, toFit: innerProposal)
+        let buttonSize =
             view.showsButton
-            ? buttonSizes.size(of: view, toFit: innerProposal)
+            ? button.size(of: view, toFit: innerProposal)
             : .zero
         return CGSize(
             width: proposal.width,
-            height: 2 * view.padding + text.height + button.height
+            height: 2 * view.padding + textSize.height + buttonSize.height
                 + (view.showsButton ? view.spacing : 0)
         )
     }
@@ -88,9 +87,7 @@ final class DocumentScreen: UIViewController {
 
 @MainActor
 func makeTitleSizes() -> SizeCache<UILabel> {
-    SizeCache<UILabel>(dependingOn: \.text, \.font, \.numberOfLines, capacity: 128) { label, proposal in
-        label.sizeThatFits(proposal)
-    }
+    SizeCache<UILabel>(dependingOn: \.text, \.font, \.numberOfLines, capacity: 128)
 }
 
 @MainActor
@@ -101,13 +98,18 @@ final class PairView: UIView {
 
 @MainActor
 func makePairSizes(titles: SizeCache<UILabel>) -> SizeCache<PairView> {
-    SizeCache<PairView>(
-        children: titles.at(\.title),
-        titles.at(\.subtitle),
+    let title = titles.bound(to: \PairView.title)
+    let subtitle = titles.bound(to: \PairView.subtitle)
+    return SizeCache<PairView>(
+        children: title,
+        subtitle,
         capacity: 128
     ) { view, proposal in
-        let title = titles.size(of: view.title, toFit: proposal)
-        let subtitle = titles.size(of: view.subtitle, toFit: proposal)
-        return CGSize(width: max(title.width, subtitle.width), height: title.height + subtitle.height)
+        let titleSize = title.size(of: view, toFit: proposal)
+        let subtitleSize = subtitle.size(of: view, toFit: proposal)
+        return CGSize(
+            width: max(titleSize.width, subtitleSize.width),
+            height: titleSize.height + subtitleSize.height
+        )
     }
 }

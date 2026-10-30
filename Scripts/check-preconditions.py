@@ -38,8 +38,8 @@ def main():
                       "depth-65": "SizeCache dependency depth exceeds maximumDepth.",
                       "leaf-depth-65": "SizeCache dependency depth exceeds maximumDepth."})
         cases.update({name: "SizeCache cannot be reentered while its measurement recipe is running."
-                      for name in ["reentry", "warm-hit-reentry", "count-reentry", "remove-reentry", "remove-all-reentry"]})
-        for operation in ("size", "remove"):
+                      for name in ["reentry", "warm-hit-reentry", "count-reentry", "remove-reentry", "remove-all-reentry", "bound-reentry"]})
+        for operation in ("size", "remove", "bound"):
             for axis in ("width", "height"):
                 for invalid in ("nan", "infinity", "negativeInfinity", "negative"):
                     cases[f"{operation}-{axis}-{invalid}"] = f"SizeCache proposal {axis} must be finite and nonnegative."

@@ -19,7 +19,9 @@ All four arms fit a real, equally configured `UITextView`: 17-point system font,
 
 The UIKit key path selects `String?`; the model and contiguous getters select `String`. Thus the complete-request comparison includes this optional-key difference. The string-only hash diagnostic unwraps the UIKit value outside timing and hashes nonoptional `String` values in all three paths, giving a more focused representation comparison. All paths preserve complete text values rather than hashes alone.
 
-Each trial creates independent fixtures and preallocated result buffers. Every arm receives eight warmup fits; cached arms use seven direct fits and one cache-seeding fit. Four-arm execution order rotates by trial. Repeated-warm requests perform no setters. Mutation and mixed requests include identical assignments to **both** `model.text` and `UITextView.text` before every request in every arm, followed by the complete direct fit or cache request. That includes assignments for adjacent repeats. Cached requests include dependency reads, selected per-request conversion, snapshot creation, hashing, equality, lookup, and fitting on a miss. Buffer writes and timer/loop overhead are included.
+Each trial creates independent fixtures and preallocated result buffers. Every arm receives eight warmup fits; cached arms use seven direct fits and one cache-seeding fit. Four-arm execution order rotates by trial.
+
+Repeated-warm requests perform no setters. Mutation and mixed requests include identical assignments to **both** `model.text` and `UITextView.text` before every request in every arm, followed by the complete direct fit or cache request. That includes assignments for adjacent repeats. Cached requests include dependency reads, selected per-request conversion, snapshot creation, hashing, equality, lookup, and fitting on a miss. Buffer writes and timer/loop overhead are included.
 
 View creation, native input construction, buffer allocation, validation, diagnostics, and serialization are outside timing. There are no timed counters. Work is synchronous on the main actor; these are sizing measurements, not rendering, frame assignment, or scrolling measurements.
 

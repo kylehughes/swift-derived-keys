@@ -24,13 +24,17 @@ Benchmarks/run.sh
 
 ## Interpret validation results
 
-The compiler script builds public-import controls under Swift 6 complete concurrency checking and warnings as errors. It also compiles the core, both UI support modules, and the UI example module, then real UIKit key-path and README fixtures, for an explicit iOS 16 simulator deployment target. SDK compilation establishes deployment compatibility, not runtime execution on iOS 16. The Simulator script discovers an installed runtime, observes every selected test, and removes only the device it creates.
+The compiler script builds public-import controls under Swift 6 complete concurrency checking and warnings as errors. It also compiles the core, both UI support modules, and the UI example module, followed by real UIKit key-path and README fixtures, for an explicit iOS 16 simulator deployment target. This checks deployment compatibility; it does not execute tests on iOS 16.
+
+The Simulator script discovers an installed runtime, observes every selected test, and removes only the device it creates.
 
 Precondition fixtures execute in isolated debug child processes. Each invalid case must terminate abnormally with its intended diagnostic; valid controls must complete. They are outside the package test targets. Keep both valid and rejected compiler controls and these trap fixtures synchronized with the public contract.
 
 ## Measure UIKit performance
 
-The [UIKit performance runner](../Benchmarks/README.md) runs XCTest benchmark fixtures in Release with coverage disabled. Use `python3 Benchmarks/run-uikit.py` for sizing and composition, or add `--suite strings` for UIKit/model text representation costs. Each command creates and removes an owned Simulator. The package's tool-hosted tests require an app host for physical-device execution; none is currently supplied. `python3 Benchmarks/test-run-uikit.py` checks both suites' result parsing. Ordinary test runs execute small correctness traces; timing trials are opt-in and do not use performance thresholds as unit-test assertions.
+The [UIKit performance runner](../Benchmarks/README.md) runs XCTest benchmark fixtures in Release with coverage disabled. Use `python3 Benchmarks/run-uikit.py` for sizing and composition, or add `--suite strings` for UIKit/model text representation costs. Each command creates and removes an owned Simulator. The package's tool-hosted tests require an app host for physical-device execution; none is currently supplied.
+
+`python3 Benchmarks/test-run-uikit.py` checks both suites' result parsing. Ordinary test runs execute small correctness traces. Timing trials are opt-in and do not use performance thresholds as unit-test assertions.
 
 ## Inspect generated documentation
 

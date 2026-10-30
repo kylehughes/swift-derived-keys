@@ -49,12 +49,14 @@ struct PreconditionProbe {
                 child.size(of: root, toFit: size)
             }
             precondition(parent.size(of: root, toFit: proposal) == proposal)
-        case "reentry", "warm-hit-reentry", "count-reentry", "remove-reentry", "remove-all-reentry":
+        case "reentry", "warm-hit-reentry", "count-reentry", "remove-reentry", "remove-all-reentry", "bound-reentry":
             let state = ReentryState()
             state.cache = SizeCache<Root>(dependingOn: \.value, capacity: 2) { root, size in
                 if state.shouldReenter {
                     let alias = state.cache!
                     switch name {
+                    case "bound-reentry":
+                        _ = alias.bound(to: \Root.self).bound(to: \Root.self).size(of: root, toFit: size)
                     case "count-reentry": _ = alias.count
                     case "remove-reentry": alias.removeSize(of: root, toFit: size)
                     case "remove-all-reentry": alias.removeAll()
@@ -73,7 +75,7 @@ struct PreconditionProbe {
             _ = state.cache.size(of: root, toFit: proposal)
         default:
             let pieces = name.split(separator: "-")
-            guard pieces.count == 3, ["size", "remove"].contains(pieces[0]),
+            guard pieces.count == 3, ["size", "remove", "bound"].contains(pieces[0]),
                 ["width", "height"].contains(pieces[1])
             else {
                 fatalError("Unknown probe: \(name)")
@@ -92,6 +94,8 @@ struct PreconditionProbe {
             let cache = SizeCache<Root>(capacity: 1) { _, size in size }
             if pieces[0] == "size" {
                 _ = cache.size(of: root, toFit: size)
+            } else if pieces[0] == "bound" {
+                _ = cache.bound(to: \Root.self).size(of: root, toFit: size)
             } else {
                 cache.removeSize(of: root, toFit: size)
             }

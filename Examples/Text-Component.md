@@ -1,10 +1,13 @@
 # Measuring a text component
 
-`DerivedKeysUIExample` is a non-product example target in this repository. Its UIKit adapter measures a
-vertical stack of plain text and an optional expansion button. The generic
-`DerivedKeys` library has no UIKit dependency. The supported fitting and cache API lives in `DerivedKeysUIKit`. UIKit declarations and tests use `#if canImport(UIKit)`.
+`DerivedKeysUIExample` measures a vertical stack of plain text and an optional
+expansion button. It is a non-product example target that runs inside this
+repository and demonstrates explicit composition of child dependency keys.
 
-This example runs inside the repository. To integrate your own view in an app, start with the [UIKit guide](UI-Measurement.md) and the supported `DerivedKeysUIKit` product. This text/button example demonstrates explicit composition of child dependency keys; the [size-cache guide](Size-Caches.md) covers the key-path sizing facade.
+To integrate your own view in an app, start with the [UIKit guide](UI-Measurement.md)
+and the supported `DerivedKeysUIKit` product. The [size-cache guide](Size-Caches.md)
+covers the key-path sizing facade. The generic `DerivedKeys` library has no UIKit
+dependency; UIKit declarations and tests use `#if canImport(UIKit)`.
 
 ```swift
 import DerivedKeysUIExample
@@ -51,15 +54,15 @@ plain-text shaping and `sizeThatFits`; the font environment is process-local.
 The button child key contains its title, font, style, effective inner bounds, and
 display scale. Its single-line title truncates at the tail. `plain` adds no
 content insets; `padded` adds 12 points on each horizontal side and 6 on each
-vertical side. Here, style controls these measurements; it does not use UIButton's
-ambient configuration or a paint style.
+vertical side. Here, style controls these measurements. Measurement does not use
+UIButton's ambient configuration or a paint style.
 
 The parent key contains the complete text child key, the optional button child
 key, padding, visible-button spacing, outer proposal, and context. Hidden buttons
 have no child key, so their title, style, font, and callback cannot invalidate the
 parent. Spacing is normalized to zero when no button exists. Parent keys compose
-child dependency keys, rather than sizes or hashes. All three operations have
-separate nominal namespaces and independently bounded LRU caches.
+child dependency keys, rather than sizes or hashes. The text, button, and parent
+operations have separate nominal namespaces and independently bounded LRU caches.
 
 ## Layout policy
 

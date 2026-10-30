@@ -2,7 +2,7 @@ import DerivedKeys
 
 /// A main-actor bounded LRU cache for complete layout results.
 ///
-/// Assigning or injecting this reference shares the same cache and recency order. Inputs
+/// Assigning or injecting this reference shares the cache and its recency order. Inputs
 /// and context must capture every value consumed by the calculation, including any relevant
 /// traits. Their equality and hashing must remain stable while stored. Capturing immutable
 /// values is the caller's responsibility; main-actor isolation does not freeze mutable aliases.

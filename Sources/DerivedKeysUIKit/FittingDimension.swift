@@ -20,7 +20,8 @@ public struct FittingDimension: Hashable, Sendable {
 
     /// Creates a finite nonnegative bound without quantization.
     ///
-    /// Both signs of zero produce the same bound. Infinity is not an unconstrained spelling.
+    /// Both signs of zero produce the same bound. Infinity does not represent
+    /// an unconstrained dimension.
     /// - Throws: `FittingProposalError.invalidDimension` for negative or nonfinite points.
     public init(points: Double) throws {
         guard points.isFinite, points >= 0 else {

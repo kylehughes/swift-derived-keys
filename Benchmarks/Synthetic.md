@@ -12,7 +12,7 @@ From the repository root on macOS, with the package's Swift 6.4 toolchain select
 Benchmarks/run.sh
 ```
 
-The runner builds `DerivedKeysBenchmarks` in release mode and starts each case in a separate process under `/usr/bin/time -l`. It writes JSON Lines measurements, per-case resource reports, and compiler, hardware, OS, arguments, and source SHA-256 digests to a temporary directory. The directory is printed before the measurements.
+The runner builds `DerivedKeysBenchmarks` in release mode and starts each case in a separate process under `/usr/bin/time -l`. It prints the temporary output directory before the measurements. That directory contains JSON Lines measurements, per-case resource reports, and metadata: compiler, hardware, OS, arguments, and source SHA-256 digests.
 
 Use the same arguments for comparisons:
 
@@ -20,7 +20,9 @@ Use the same arguments for comparisons:
 Benchmarks/run.sh --iterations 5000 --payload-bytes 8192 --capacity 128
 ```
 
-Defaults are 1,000 measured operations, a 4,096-byte payload, and a capacity of 128 entries. The large-payload case uses at least 262,144 bytes. Arguments must be positive integers; iteration and capacity limits are 1,000,000, and the payload limit is 16,777,216 bytes. To choose the output directory, set `BENCHMARK_OUTPUT_DIR` to a new directory for each run. Keep generated results outside the repository when comparing candidates. Set `BENCHMARK_SCRATCH_PATH` to use an isolated SwiftPM build directory.
+Defaults are 1,000 measured operations, a 4,096-byte payload, and a capacity of 128 entries. The large-payload case uses at least 262,144 bytes. Arguments must be positive integers; iteration and capacity limits are 1,000,000, and the payload limit is 16,777,216 bytes.
+
+To choose the output directory, set `BENCHMARK_OUTPUT_DIR` to a new directory for each run. Keep generated results outside the repository when comparing candidates. Set `BENCHMARK_SCRATCH_PATH` to use an isolated SwiftPM build directory.
 
 For one case, run the executable through SwiftPM:
 

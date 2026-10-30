@@ -1,6 +1,6 @@
 # Concrete dependency erasure
 
-The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. The change removes an internal bottleneck, but does not establish that caching is always useful. See the [UIKit results](UIKit-Results.md) for measurements of application sizing.
+The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. The change removes an internal bottleneck, but does not establish that caching is always useful. For application-sizing measurements, see the [historical UIKit results](UIKit-Results.md) or use the [UIKit benchmark guide](README.md) to choose a report.
 
 ## What changed
 
@@ -32,7 +32,9 @@ The size graph contains a parent and two children. A warm parent hits one unchan
 | Parent miss, warm children | 488.07 [471.29–506.08] | 1,000 / 0 / 0 |
 | Cold composed request | 865.17 [843.17–889.81] | 1,000 / 1,000 / 1,000 |
 
-The parent-miss trace changes spacing while retaining the child inputs and proposals. It avoids child calculation but still captures and looks up parent and child snapshots and inserts the parent result. The cold trace changes both children and pays for the complete cache path and calculation. Both fill and evict bounded storage. Warm parent calculations are 0 / 0 / 0 after one warmup calculation per cache. The direct trace performs 1,000 calculations at every level; cold and direct checksums match. Counts and result checks are enforced by the existing executable.
+The parent-miss trace changes spacing while retaining the child inputs and proposals. It avoids child calculation but still captures and looks up parent and child snapshots and inserts the parent result. The cold trace changes both children and pays for the complete cache path and calculation. Both fill and evict bounded storage.
+
+Warm parent calculations are 0 / 0 / 0 after one warmup calculation per cache. The direct trace performs 1,000 calculations at every level; cold and direct checksums match. The existing executable enforces counts and result checks.
 
 ## Reproduce and interpret
 

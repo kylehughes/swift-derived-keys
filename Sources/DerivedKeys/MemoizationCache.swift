@@ -8,8 +8,8 @@
 /// Dictionary indexing and recency bookkeeping take expected amortized constant time,
 /// apart from hashing and equality. Standard-library copy-on-write storage makes the
 /// first mutation after a copy potentially linear in the number of allocated entries.
-/// Reentering the same cache during `compute` is unsupported. Mutate a cache exclusively;
-/// its conditional `Sendable` conformance does not provide shared synchronization.
+/// Reentering the same cache during `compute` is unsupported. Mutation requires exclusive
+/// access; the cache's conditional `Sendable` conformance does not provide shared synchronization.
 public struct MemoizationCache<Key, Value> where Key: Hashable {
     /// The maximum number of entries, rather than a limit on retained bytes.
     public let capacity: Int

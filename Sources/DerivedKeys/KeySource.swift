@@ -34,7 +34,7 @@ public struct KeySource<Input> {
 
     /// Creates an original source whose provider runs on each evaluation.
     ///
-    /// Each shared source is read once in a single evaluation. The returned value
+    /// Each shared source is read once per evaluation. The returned value
     /// must be an immutable snapshot, not a mutable reference used for hashing.
     public init<Value>(_ label: String, provider: @escaping @Sendable (Input) -> Value) where Value: Hashable {
         node = Node(
@@ -100,7 +100,7 @@ public struct KeySource<Input> {
     ///
     /// Memoization is request-local. Previously evaluated keys cannot trigger
     /// providers again. Capturing related mutable properties individually is not
-    /// an atomic snapshot; callers own consistency across the complete request.
+    /// an atomic snapshot; callers are responsible for consistency across the complete request.
     /// - Complexity: O(v + e) visits for v nodes and e edges, plus provider work.
     ///   Result equality and hashing inspect values and repeated child occurrences.
     public func snapshot(for input: Input) -> DependencySnapshot {

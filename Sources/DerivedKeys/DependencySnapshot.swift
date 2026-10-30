@@ -3,8 +3,9 @@
 /// Snapshots contain complete values and structure, never provider closures or
 /// source graph nodes. Equality preserves concrete value types, labels, child
 /// order, multiplicity, and nesting. Captured values must have stable equality and
-/// hashing; mutable references require an explicit immutable projection. The erased representation
-/// deliberately has no Sendable conformance. Prefer typed keys for transferable values.
+/// hashing; mutable references require an explicit immutable projection.
+/// The erased representation has no Sendable conformance. Prefer typed keys
+/// for transferable values.
 public struct DependencySnapshot: Hashable {
     /// The largest supported number of nodes on a root-to-leaf path.
     ///

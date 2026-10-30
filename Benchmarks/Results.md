@@ -2,7 +2,7 @@
 
 This sample records one run of the [synthetic benchmark suite](Synthetic.md) on 2026-10-28 at 07:00 UTC. It is a historical measurement of this synthetic workload, with one sample per case and no statistical confidence interval.
 
-For measurements of application sizing, read the [UIKit results](UIKit-Results.md) and [methodology](README.md). The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair; use the [synthetic methodology](Synthetic.md) to interpret or rerun these diagnostic cases.
+The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair; use the [synthetic methodology](Synthetic.md) to interpret or rerun these diagnostic cases. For application-sizing measurements, see the [historical UIKit results](UIKit-Results.md) or start with the [UIKit benchmark guide](README.md) for current results and methodology.
 
 ```sh
 Benchmarks/run.sh

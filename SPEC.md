@@ -8,7 +8,7 @@ Use the [README](README.md) for package usage and [maintenance guide](Documentat
 
 Implement a reusable Swift library for deriving hashable keys from the subset of state that affects a particular computation.
 
-A primary use case is caching UI measurements: two model configurations can reuse a component’s measured size when their layout-relevant state and measurement environment are equivalent, even if other model properties differ.
+A primary use case is caching UI measurements: two model configurations can reuse a component's measured size when their layout-relevant state and measurement environment are equivalent, even if other model properties differ.
 
 The core must remain domain-independent. It must support computations such as document transformation, parsing, formatting, or other deterministic derived values without importing UI frameworks or assuming the main actor.
 
@@ -39,13 +39,13 @@ the application must uphold:
 key(a) == key(b)  implies  compute(a) and compute(b) are interchangeable
 ```
 
-“Interchangeable” includes everything the caller observes in the returned result. Cached computations must not depend on side effects that need to occur on every call.
+"Interchangeable" includes everything the caller observes in the returned result. Cached computations must not depend on side effects that need to occur on every call.
 
 The reverse implication is unnecessary. Two different keys may produce equal results. Conservatively including an extra dependency reduces cache hits but remains correct; omitting a dependency that can change the result can return a wrong result.
 
 A key expresses equivalence for one computation, not necessarily model equality, entity identity, or visual equality.
 
-Do not change a model’s general-purpose `Equatable` or `Hashable` conformance to implement this narrower equivalence. Define a separate projection or key type. One model may expose several projections for different computations.
+Do not change a model's general-purpose `Equatable` or `Hashable` conformance to implement this narrower equivalence. Define a separate projection or key type. One model may expose several projections for different computations.
 
 Examples:
 
@@ -56,7 +56,7 @@ Examples:
 | Share-action callback changes | Irrelevant | Irrelevant |
 | Export format changes | Irrelevant | Relevant |
 
-These classifications depend on the actual calculation. The library cannot infer complete dependencies from a model’s fields.
+These classifications depend on the actual calculation. The library cannot infer complete dependencies from a model's fields.
 
 ## 3. Sources, composition, and evaluated keys
 
@@ -101,13 +101,13 @@ Use Swift `Hashable` semantics: equal keys must hash equally; equal hashes do no
 
 The cache must retain enough information to compare complete semantic keys. Store entries by a `Hashable` key, rather than by its `hashValue` or a finalized `Int` alone.
 
-A hash collision must never return another key’s result. This applies at every composition level: retaining only child hashes discards information before the parent key is formed.
+A hash collision must never return another key's result. This applies at every composition level: retaining only child hashes discards information before the parent key is formed.
 
 A precomputed digest is permitted as an optimization if it is derived from an immutable snapshot and equality still checks the semantic key when necessary. Equal keys must use the same hashing scheme and seed policy.
 
 Swift `Hasher` output is process-local and may change between executions or standard-library versions. Do not persist it, transmit it as a stable identifier, or promise deterministic numeric values. Stable serialization and cryptographic fingerprints are separate features. [Swift Hasher documentation](https://developer.apple.com/documentation/swift/hasher).
 
-An operation’s namespace must distinguish computations that happen to receive the same dependency values. Prefer separate nominal key types or a typed operation token. Shared erased storage must preserve that distinction. A free-form diagnostic label alone is insufficient to prevent unrelated operations from sharing entries accidentally.
+An operation's namespace must distinguish computations that happen to receive the same dependency values. Prefer separate nominal key types or a typed operation token. Shared erased storage must preserve that distinction. A free-form diagnostic label alone is insufficient to prevent unrelated operations from sharing entries accidentally.
 
 Algorithm versions distinguish concurrently valid implementations when necessary. A process-local cache discarded on launch does not need versioning solely for app updates.
 
@@ -123,11 +123,11 @@ The required baseline is **pull on evaluation**:
 
 The original concept reevaluates provider closures when a hash is read. Preserve that ability. Do not introduce a requirement to send change notifications before a later lookup can observe changed state.
 
-Provide an explicit-input path, such as a projection from an immutable input snapshot, as the preferred way to maintain consistency and avoid retaining a model owner. A live provider adapter may capture current state within its owner’s isolation and then use the same path.
+Provide an explicit-input path, such as a projection from an immutable input snapshot, as the preferred way to maintain consistency and avoid retaining a model owner. A live provider adapter may capture current state within its owner's isolation and then use the same path.
 
 Providers must be synchronous, side-effect-free reads for the duration of evaluation. They must not mutate dependencies, recursively evaluate the same source graph, perform I/O, or suspend. Capture time, randomness, external configuration, or resource versions explicitly if they affect the computation.
 
-A request must represent one coherent input state. Merely reading several individually synchronized properties is insufficient if their values can change between reads. Capture related state together or evaluate and calculate in one non-suspending operation within its mutation owner’s isolation.
+A request must represent one coherent input state. Merely reading several individually synchronized properties is insufficient if their values can change between reads. Capture related state together or evaluate and calculate in one non-suspending operation within its mutation owner's isolation.
 
 If a shared source appears multiple times, every occurrence in one evaluation must observe the same captured value. This can follow from an immutable input snapshot; a graph evaluator may instead use request-local memoization. Evaluation identity used for memoization must not become part of the semantic key.
 
@@ -175,7 +175,7 @@ The cache owns evaluated keys and results. It must not retain providers, calcula
 
 A synchronous value-type cache with exclusive mutation is sufficient for the baseline. Reentering the same cache during `compute` is unsupported and must be documented. Separate caches may be composed.
 
-A shared concurrent or async cache is optional. If supplied, define duplicate-miss behavior, cancellation, failures, reentrancy, and clearing while work is in flight. Capture the request key before suspension, calculate from that request’s snapshot, and prevent cleared work from repopulating the cache under an obsolete generation. Do not add these complexities to the synchronous baseline without a use case.
+A shared concurrent or async cache is optional. If supplied, define duplicate-miss behavior, cancellation, failures, reentrancy, and clearing while work is in flight. Capture the request key before suspension, calculate from that request's snapshot, and prevent cleared work from repopulating the cache under an obsolete generation. Do not add these complexities to the synchronous baseline without a use case.
 
 ## 7. Swift concurrency and ownership
 
@@ -193,21 +193,37 @@ Avoid ownership cycles between an owner, its stored sources, and their closures.
 
 ## 8. Reusable UIKit support and UI measurement examples
 
-The README's primary example uses `DerivedKeysUI.SizeCache` to cache an individual measurement and compose text/button/parent sizes. Its application `DocumentContentView` performs frame-based layout using the same child handles. Keep the explicit-input, complete-frame `LayoutCache` example as an advanced alternative.
+The README's primary example uses `DerivedKeysUI.SizeCache` to cache an individual measurement and compose text/button/parent sizes. Its application `DocumentContentView` performs frame-based layout using raw native-fitting leaf caches and bound handles in the parent recipe. The bundle publicly retains the raw leaf caches and parent. Control getters only read controls; initialization and model changes eagerly synchronize content and line limits, and initialization and trait lifecycle changes synchronize fonts. The application still schedules layout and refits the container.
+
+Keep the explicit-input, complete-frame `LayoutCache` example as an advanced alternative.
 
 ### 8a. Key-path size recipes
 
+#### Construction and lookup
+
 Add a `DerivedKeysUI` production product without removing existing products. `SizeCache<Root>` is a main-actor reference facade whose initializer binds inferred heterogeneous hashable key paths, optional ordered child descriptions, explicit local capacity, and one synchronous measurement closure. Ordinary lookup is `size(of:toFit:)`. Root needs neither Hashable nor Sendable. Zero selected properties and zero children are valid. No user strings, erased wrappers, custom input structs, operation enums, macros, or builders are required.
 
-Same-root children pass directly; `child.at(keyPath)` maps a nonoptional nested root. Mixed mappings and multiple paths to one child must capture each binding independently. Descriptions are immutable and closed to outside construction. Child edges retain dependency readers, not result storage or measurement recipes; calculation closures retain the handles they call. Composition remains acyclic, with a checked maximum of 64 snapshot nodes per path, including selected value leaves.
+For `Root: UIView`, add a conditional UIKit convenience initializer with heterogeneous hashable key paths and local capacity, no child list, and no measurement closure. A miss calls the passed root's `sizeThatFits(_:)` with the normalized effective proposal. Zero selected properties are valid. Preserve the existing custom-recipe initializer and non-UIKit use. Neither initializer infers complete dependencies, enforces closure purity, or makes mutable Hashable aliases stable. A native-fitting cache must not be called from its measured view's own override, since the resulting same-cache reentry fails the existing precondition; custom recipes remain the escape hatch.
+
+#### Bind child roots
+
+`SizeCache.bound(to:)` creates a final main-actor `SizeCacheBinding<Parent>` subclass of `SizeDependencies<Parent>` for a nonoptional key path. A binding exposes `size(of:toFit:)` and chainable `bound(to:)`, retains the original cache for lookup, and adds no result storage, key identity, or snapshot depth. Its interface is measurement-only: count, capacity, removal, and clearing remain on the original cache. Capturing a binding as a child description retains only dependency readers, not the binding, cache, or measurement closure. Parent calculations capture the bound handles they invoke. Independent paths and chained bindings must read their respective roots independently.
+
+Same-root children pass directly; `child.at(keyPath)` remains a dependency-only mapping of a nonoptional nested root and does not retain its cache. Bound handles combine that description with lookup. Mixed mappings and multiple paths to one child must capture each binding independently. Descriptions are immutable and closed to outside construction. Child edges retain dependency readers, not result storage or measurement recipes; calculation closures retain the handles they call. Composition remains acyclic, with a checked maximum of 64 snapshot nodes per path, including selected value leaves.
+
+#### Keys and proposals
 
 Keys contain full type-preserving dependency values and ordered recursive structure, the cache's own measurement scope, and both effective proposal dimensions. Snapshot selection never measures, consults result storage, or substitutes child sizes. Every declared child participates even when hidden. Parents select all variable inputs to proposal transformations, branches, and combination; transforms remain solely in calculations, and each invoked child keys its actual proposal.
 
 Validate proposals without throwing: accept finite nonnegative axes, including greatest finite magnitude, normalize signed zero, and pass the same normalized proposal to measurement without silent rounding. Invalid axes, negative capacity, excessive depth, and same-cache measurement reentry fail descriptive preconditions. Existing generic throwing APIs retain their error behavior.
 
+#### Storage and ownership
+
 Each facade uses the existing bounded LRU, with its own count, capacity, removal, clearing, and capacity-zero behavior. Parent hits skip their calculation and child result lookups; parent misses may reuse child entries. Child clearing or eviction does not alter semantic dependencies and therefore does not invalidate retained parent results. Clearing a parent clears only its entries. Do not share one mutating value cache across recursive recipes or hold overlapping accesses; guard same-cache reentry before storage access.
 
 Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership. It also schedules UIKit layout and assigns the outer frame.
+
+#### Validation
 
 Validate heterogeneous/nested/zero dependencies, selected/unselected changes, both dimensions and normalization, transformed child proposals, parent-only and child-only changes, parent hits skipping child recency, three levels, all binding forms, root release, recipe scope, collisions, bounded eviction, zero capacity, independent clearing, and existing generic semantics. Compile real UIKit key paths at iOS 16 with Swift 6.4, test diagnostics in isolated processes, and measure snapshot, warm parent, parent miss with warm children, cold composed, and equivalent direct costs using the existing benchmark harness.
 
@@ -254,7 +270,7 @@ The sizing adapter must include the effective fitting proposal automatically. Pa
 
 Represent unconstrained dimensions explicitly. Reject NaN and invalid negative finite dimensions at the adapter boundary. Translate framework-specific unbounded sentinels into a documented representation. If dimensions are quantized, use the same normalized values for both the key and the actual measurement; rounding the key alone can produce wrong hits.
 
-Hash rendered content or a projection of its metric-affecting properties. A stable document ID alone is insufficient if its text or styling can change. An ID plus revision is valid only if every relevant change updates the revision and the pair uniquely identifies immutable content within the cache’s scope.
+Hash rendered content or a projection of its metric-affecting properties. A stable document ID alone is insufficient if its text or styling can change. An ID plus revision is valid only if every relevant change updates the revision and the pair uniquely identifies immutable content within the cache's scope.
 
 Action callbacks, analytics identifiers, unrelated URLs, and paint-only colors should be omitted when the sizing algorithm does not consume them. Changing button visibility must affect the component key even when it does not affect the text key.
 

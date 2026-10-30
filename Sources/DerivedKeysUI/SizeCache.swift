@@ -9,9 +9,10 @@ import DerivedKeysUIKit
 /// read values consistent with the preceding snapshot; main-actor isolation does not freeze
 /// aliases. Child descriptions contribute values, not child measurements or proposals.
 ///
-/// Entries retain snapshots and sizes without implicitly retaining roots. The configured closure is
-/// retained for this cache's lifetime and may explicitly retain caller-owned objects. Sharing
-/// this reference shares result storage and recency. Results are stored without validation,
+/// Entries retain snapshots and sizes without implicitly retaining roots. The cache retains
+/// the configured closure for its lifetime; that closure may explicitly retain caller-owned objects.
+///
+/// Sharing this reference shares result storage and recency. Results are stored without validation,
 /// rounding, or clamping. Same-cache measurement reentry, including storage inspection or
 /// removal through an alias, is unsupported and fails a precondition.
 @MainActor

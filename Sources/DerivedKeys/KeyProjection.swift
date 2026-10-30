@@ -4,7 +4,7 @@
 /// Projection is synchronous and runs when ``key(for:context:version:)`` is called.
 /// It must be a side-effect-free read and must not suspend or recursively evaluate
 /// itself. Actor-owned clients capture their state within that actor's isolation.
-/// This projection neither retains inputs after a call nor requires them to be Sendable.
+/// The projection does not retain inputs after a call or require them to be Sendable.
 public struct KeyProjection<Operation, Input, Dependencies> where Dependencies: Hashable {
     private let project: (Input) -> Dependencies
 

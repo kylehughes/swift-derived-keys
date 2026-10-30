@@ -173,7 +173,7 @@ private enum Scenario: String {
     var timingBoundary: String {
         if changesConfiguration {
             return
-                "configure-plus-measure; identical assignments of prebuilt text, fonts, immutable attributed strings in both arms"
+                "configure-plus-measure; identical eager assignments of prebuilt text, fonts, immutable attributed strings and document trait updates in both arms"
         }
         if self == .equivalentPoolViews {
             return
@@ -356,7 +356,7 @@ private final class Fixture {
         retainedButtons = documents.map(\.button)
         // The pool scenario fits only a separate seed, leaving all eight request controls initially unfitted.
         _ = cached(Request(view: 0, variant: workload.initialVariant))
-        // Warm after the synchronized getters above, so warm direct controls have no intervening setters.
+        // Configuration is eager in both arms; retain the existing controls before warming UIKit.
         for index in 0 ..< scenario.poolCount where scenario != .equivalentPoolViews || index == 0 {
             let request = Request(view: index, variant: workload.initialVariant)
             for _ in 0 ..< Self.warmupIterations { _ = direct(request) }
@@ -399,32 +399,32 @@ private final class Fixture {
                 if scenario.changesConfiguration { configure(request) }
                 let view = documents[request.view]
                 if workload == .documentParent {
-                    let parentHit = contains(bundle.contentSizes, view: view, proposal: request.proposal)
+                    let parentHit = contains(cache: bundle.contentSizes, root: view, proposal: request.proposal)
                     if parentHit {
                         hits.parent += 1
                     } else {
                         misses.parent += 1
                         let inner = innerProposal(request, view: view)
                         record(
-                            contains(bundle.textSizes, view: view, proposal: inner),
+                            contains(cache: bundle.textSizes, root: view.textView, proposal: inner),
                             hits: &hits.text,
                             misses: &misses.text
                         )
                         record(
-                            contains(bundle.buttonSizes, view: view, proposal: inner),
+                            contains(cache: bundle.buttonSizes, root: view.button, proposal: inner),
                             hits: &hits.button,
                             misses: &misses.button
                         )
                     }
                 } else if workload == .documentText {
                     record(
-                        contains(bundle.textSizes, view: view, proposal: request.proposal),
+                        contains(cache: bundle.textSizes, root: view.textView, proposal: request.proposal),
                         hits: &hits.text,
                         misses: &misses.text
                     )
                 } else {
                     record(
-                        contains(bundle.buttonSizes, view: view, proposal: request.proposal),
+                        contains(cache: bundle.buttonSizes, root: view.button, proposal: request.proposal),
                         hits: &hits.button,
                         misses: &misses.button
                     )
@@ -615,34 +615,47 @@ private final class Fixture {
     private func resetStorage() {
         bundle = DocumentSizeCaches(capacity: Self.capacity)
         if workload == .textView {
-            let measure: @MainActor (UITextView, CGSize) -> CGSize
             if counted {
-                measure = { [unowned self] view, proposal in
+                textViewCache = SizeCache(dependingOn: \.text, \.font, capacity: Self.capacity) {
+                    [unowned self] view, proposal in
                     self.leafMeasurements += 1
                     return view.sizeThatFits(proposal)
                 }
             } else {
-                measure = { view, proposal in view.sizeThatFits(proposal) }
+                textViewCache = SizeCache(dependingOn: \.text, \.font, capacity: Self.capacity)
             }
-            textViewCache = SizeCache(dependingOn: \.text, \.font, capacity: Self.capacity, measure: measure)
         } else if !workload.isDocument {
-            let measure: @MainActor (UILabel, CGSize) -> CGSize
             if counted {
-                measure = { [unowned self] view, proposal in
+                let measure: @MainActor (UILabel, CGSize) -> CGSize = { [unowned self] view, proposal in
                     self.leafMeasurements += 1
                     return view.sizeThatFits(proposal)
                 }
-            } else {
-                measure = { view, proposal in view.sizeThatFits(proposal) }
-            }
-            if workload == .labelAttributed {
+                if workload == .labelAttributed {
+                    labelCache = SizeCache(
+                        dependingOn: \.attributedText,
+                        \.font,
+                        \.numberOfLines,
+                        \.lineBreakMode,
+                        capacity: Self.capacity,
+                        measure: measure
+                    )
+                } else {
+                    labelCache = SizeCache(
+                        dependingOn: \.text,
+                        \.font,
+                        \.numberOfLines,
+                        \.lineBreakMode,
+                        capacity: Self.capacity,
+                        measure: measure
+                    )
+                }
+            } else if workload == .labelAttributed {
                 labelCache = SizeCache(
                     dependingOn: \.attributedText,
                     \.font,
                     \.numberOfLines,
                     \.lineBreakMode,
-                    capacity: Self.capacity,
-                    measure: measure
+                    capacity: Self.capacity
                 )
             } else {
                 labelCache = SizeCache(
@@ -650,8 +663,7 @@ private final class Fixture {
                     \.font,
                     \.numberOfLines,
                     \.lineBreakMode,
-                    capacity: Self.capacity,
-                    measure: measure
+                    capacity: Self.capacity
                 )
             }
         }
@@ -691,8 +703,8 @@ private final class Fixture {
         }
         let view = documents[request.view]
         switch workload {
-        case .documentText: return bundle.textSizes.size(of: view, toFit: request.proposal)
-        case .documentButton: return bundle.buttonSizes.size(of: view, toFit: request.proposal)
+        case .documentText: return bundle.textSizes.size(of: view.textView, toFit: request.proposal)
+        case .documentButton: return bundle.buttonSizes.size(of: view.button, toFit: request.proposal)
         default: return bundle.contentSizes.size(of: view, toFit: request.proposal)
         }
     }
@@ -721,10 +733,9 @@ private final class Fixture {
         CGSize(width: max(0, request.width - 2 * view.padding), height: .greatestFiniteMagnitude)
     }
 
-    private func contains(_ cache: SizeCache<DocumentContentView>, view: DocumentContentView, proposal: CGSize) -> Bool
-    {
+    private func contains<Root>(cache: SizeCache<Root>, root: Root, proposal: CGSize) -> Bool {
         let before = cache.count
-        cache.removeSize(of: view, toFit: proposal)
+        cache.removeSize(of: root, toFit: proposal)
         return cache.count < before
     }
 

@@ -1,10 +1,12 @@
 # Composing size caches
 
-Import `DerivedKeysUI` to bind key-path dependencies and a measurement closure in a retained `SizeCache`. The [README](../README.md) starts with a single measurement and composes a text/button layout. The [complete application fixture](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a controller that assigns frames. These are example application types; the library does not require them.
+Use `DerivedKeysUI.SizeCache` to retain measurements selected by key-path dependencies. For UIKit roots, omit the closure to call the passed view's `sizeThatFits(_:)` on a miss; supply a closure for a custom recipe.
+
+Start with the [README](../README.md) for one measurement and a composed text/button layout. This guide covers mapped children, ownership, and dependency choices. The [complete application example](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a controller that assigns frames. These are application types; the library does not require them.
 
 ## Map a child root
 
-A child can measure a nested root. `at(_:)` maps its dependency description; call the original child with that mapped root inside the calculation:
+A child can measure a nested root. `bound(to:)` creates a handle that both describes dependencies and looks up measurements through the selected path. This label recipe assumes every other measurement setting is fixed:
 
 ```swift
 import DerivedKeysUI
@@ -12,9 +14,7 @@ import UIKit
 
 @MainActor
 func makeTitleSizes() -> SizeCache<UILabel> {
-    SizeCache<UILabel>(dependingOn: \.text, \.font, \.numberOfLines, capacity: 128) { label, proposal in
-        label.sizeThatFits(proposal)
-    }
+    SizeCache<UILabel>(dependingOn: \.text, \.font, \.numberOfLines, capacity: 128)
 }
 
 @MainActor
@@ -25,20 +25,27 @@ final class PairView: UIView {
 
 @MainActor
 func makePairSizes(titles: SizeCache<UILabel>) -> SizeCache<PairView> {
-    SizeCache<PairView>(
-        children: titles.at(\.title), titles.at(\.subtitle),
+    let title = titles.bound(to: \PairView.title)
+    let subtitle = titles.bound(to: \PairView.subtitle)
+    return SizeCache<PairView>(
+        children: title, subtitle,
         capacity: 128
     ) { view, proposal in
-        let title = titles.size(of: view.title, toFit: proposal)
-        let subtitle = titles.size(of: view.subtitle, toFit: proposal)
-        return CGSize(width: max(title.width, subtitle.width), height: title.height + subtitle.height)
+        let titleSize = title.size(of: view, toFit: proposal)
+        let subtitleSize = subtitle.size(of: view, toFit: proposal)
+        return CGSize(
+            width: max(titleSize.width, subtitleSize.width),
+            height: titleSize.height + subtitleSize.height
+        )
     }
 }
 ```
 
-The label recipe assumes every other measurement setting is fixed. A title and subtitle with different selected values produce separate child requests through the same cache. Each mapping captures its own root binding; the subtitle cannot accidentally reuse the title's snapshot during traversal. Equal child inputs and proposals may intentionally reuse a result. Same-root children can appear alongside mapped children in one initializer.
+A title and subtitle with different selected values produce separate child requests through the same cache. Each mapping captures its own root binding; the subtitle cannot accidentally reuse the title's snapshot during traversal. Equal child inputs and proposals may intentionally reuse a result. Same-root children can appear alongside mapped children in one initializer.
 
-Mappings do not unwrap optional roots. Arbitrary mapping closures and conditional child declarations are not supported. Map a nonoptional key path or keep the condition and any required stable projection in the parent recipe. Declared children are always captured, even if the calculation takes a branch that does not measure them. The facade does not discover caches called by a closure: list the children that determine the parent result and capture those same handles in its calculation.
+A bound handle is a main-actor `SizeCacheBinding<Parent>` and can be chained with another `bound(to:)` to reach a further parent. It retains the original cache for measurement, with no additional storage, key identity, or snapshot depth. Inspect and clear that original cache; bindings have no count, capacity, or clearing API. Use a fully qualified key path such as `\PairView.title` when creating a standalone binding so Swift can infer the parent type.
+
+Bindings and mappings do not unwrap optional roots. Arbitrary mapping closures and conditional child declarations are not supported. Map a nonoptional key path or keep the condition and any required stable projection in the parent recipe. Declared children are always captured, even if the calculation takes a branch that does not measure them. The facade does not discover caches called by a closure: list the children that determine the parent result and capture those same handles in its calculation.
 
 ## Keep proposals with their calculations
 
@@ -50,9 +57,15 @@ Both proposal axes must be finite and nonnegative. `CGFloat.greatestFiniteMagnit
 
 ## Keep ownership explicit
 
-The document screen owns a `DocumentSizeCaches` bundle and injects it into reusable views. Its initializer creates local text and button handles, then creates the parent using those same handles. Parent closures capture the children, not the bundle or a view. Each cache has its own capacity and LRU order. A view-owned cache and an intentionally static cache are equally valid; no global storage is installed by the package.
+The document screen owns a `DocumentSizeCaches` bundle and injects it into reusable views. The bundle's initializer retains the `UITextView` and `UIButton` caches as public properties and creates local bound handles for the parent. The parent declares and captures those same bindings. Its closure captures the children, not the bundle or a view.
 
-Descriptions retain dependency readers only. A descriptor from `child.at(\.title)` does not retain the child's measurement closure or entries. The parent closure must retain any child handle it will call. Cached entries contain captured values and `CGSize` results; the root supplied to `size(of:toFit:)` is not implicitly retained. Explicit user captures or reference-valued dependencies can still retain a root or owner.
+Each cache has its own capacity and LRU order. A view-owned cache and an intentionally static cache are equally valid; the package installs no global storage.
+
+Descriptions retain dependency readers only, without retaining the cache, bound lookup handle, or measurement closure. The parent closure must retain any child handle it will call.
+
+For dependency-only mapping, use `child.at(\PairView.title)` and call `child.size(of: view.title, toFit: proposal)` in the calculation. Unlike a bound lookup handle, that descriptor does not retain the original cache, its measurement closure, or entries.
+
+Cached entries contain captured values and `CGSize` results; the root supplied to `size(of:toFit:)` is not implicitly retained. Explicit user captures or reference-valued dependencies can still retain a root or owner.
 
 `count` and `capacity` describe one cache. `removeSize(of:toFit:)` removes its entry for the current dependencies and normalized proposal; `removeAll()` clears only its storage. Parent and child results have independent eviction and clearing. Returning to a previous input may recover a retained result. Clearing after an undeclared external change must cover every affected cache; declaring that external input is usually easier to maintain.
 
@@ -89,13 +102,17 @@ If full-content hashing still dominates, an optional compact projection is the c
 
 ## Inspect snapshots and composition limits
 
-Selection and calculation are synchronous on the main actor. Keep selected values and any other result-relevant state consistent throughout the request. Dependency getters should read values without mutation, I/O, or recursive evaluation. A hit still reads all declared dependencies and hashes/compares their full snapshots, but does not invoke measurements or consult child result storage. `snapshot(of:)` exposes the dependency snapshot for inspection; it excludes proposal and recipe identity and is not a standalone complete result key.
+Selection and calculation are synchronous on the main actor. Keep selected values and any other result-relevant state consistent throughout the request. Dependency getters should read values without mutation, I/O, or recursive evaluation.
+
+A hit still reads all declared dependencies and hashes and compares their full snapshots, but does not invoke measurements or consult child result storage. `snapshot(of:)` exposes the dependency snapshot for inspection; it excludes proposal and recipe identity and is not a complete result key on its own.
 
 Public construction cannot create a cycle in the immutable graph. Its limit is 64 snapshot nodes per path, counting value leaves and composition boundaries. Mapping adds no boundary. An empty cache has depth one; a cache selecting a property has depth two; a parent adds one. Excess depth fails a descriptive precondition. Same-cache measurement reentry, including result inspection/removal through an alias, also fails a precondition; nesting different caches is supported.
 
 ## Integrate with UIKit layout
 
-Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes its text and category-only font settings before a direct leaf measurement; it schedules layout when content or category changes. The controller remains responsible for refitting and assigning the container frame.
+Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes text and line limits at initialization and model changes, and category-only fonts at initialization and trait changes. Its control getters do not configure the controls. It schedules layout when content or category changes. The controller remains responsible for refitting and assigning the container frame.
+
+A native-fitting cache calls the passed view's `sizeThatFits(_:)` on a miss. Calling that same cache from that view's override reenters the cache and fails a precondition. Use the closure initializer to choose a different measurement path when needed. The convenience initializer does not infer dependencies or make mutable `Hashable` aliases stable.
 
 ## Choose a lower-level result API
 

@@ -229,7 +229,7 @@ public final class TextComponentMeasurer {
     /// The number of component calculations performed on cache misses.
     public private(set) var componentCalculationCount = 0
 
-    /// Uses the same explicit nonnegative capacity for each independently bounded cache.
+    /// Creates independently bounded caches with the same explicit nonnegative capacity.
     public init(capacity: Int) {
         textCache = MemoizationCache(capacity: capacity)
         buttonCache = MemoizationCache(capacity: capacity)

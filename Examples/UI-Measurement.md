@@ -1,10 +1,14 @@
 # Caching a custom UIKit layout
 
-Add the `DerivedKeysUIKit` product to your app target and import it alongside UIKit. For the shorter key-path sizing API, start with [SizeCache](Size-Caches.md). This guide covers the explicit-input API for complete layout results. Its [compiled example](../Sources/DerivedKeysUIExample/LabelView.swift) caches a `Layout` containing an overall size and a label frame. The example target is not a package product; copy and adapt the view in your app.
+Use `DerivedKeysUIKit` to cache complete layout results, including sizes and frames, from explicit inputs. Add the product to your app target and import it alongside UIKit. For the shorter key-path sizing API, start with [SizeCache](Size-Caches.md).
+
+The [compiled `LabelView` example](../Sources/DerivedKeysUIExample/LabelView.swift) caches a `Layout` containing an overall size and a label frame. The example target is not a package product; copy and adapt the view in your app.
 
 ## Capture one request
 
 `LayoutCache<Operation, Input, Context, Value>` is a main-actor reference type. Declare a distinct operation enum for each layout algorithm, capture its content in a `Hashable` input, and capture any environment values the algorithm reads in a `Hashable` context. The result can be `CGSize` or an immutable structure containing all the frames and sizes your view needs.
+
+Retain the cache in your view or another main-actor owner to reuse results across requests. The function below illustrates a single request.
 
 ```swift
 import DerivedKeysUIKit
@@ -30,7 +34,7 @@ func measureBadge() throws -> CGSize {
 }
 ```
 
-This function illustrates one request; retain the cache in your view or another main-actor owner to reuse results across requests. The cache automatically includes the effective fitting proposal in its key, then supplies the captured input, proposal, and context to the calculation. Measure from those arguments. Reading other mutable view or model properties inside the callback can produce an incomplete key even on the main actor.
+The cache automatically includes the effective fitting proposal in its key, then supplies the captured input, proposal, and context to the calculation. Measure from those arguments. Reading other mutable view or model properties inside the callback can produce an incomplete key even on the main actor.
 
 Capture actual text and metric-affecting styles, not only a model ID. Include resolved fonts, line limits, insets, layout direction, or relevant traits when the algorithm consumes them. Include display scale if your own rounding depends on it. An empty context is appropriate only when no variable environment affects the calculation. Hashable reference values can still have mutable aliases; project stable values and keep cached results stable too.
 

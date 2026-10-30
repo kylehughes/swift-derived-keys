@@ -1,12 +1,14 @@
 # Using the generic key and memoization APIs
 
-Import `DerivedKeys` for non-UI computations, explicit snapshots, runtime source graphs, or typed operation keys. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache. The [sizing convenience API](../README.md) uses the same snapshots and bounded storage while owning its main-actor measurement recipe.
+Import `DerivedKeys` to select dependencies and manage synchronous reuse directly. Use it for non-UI computations, explicit snapshots, runtime source graphs, or typed operation keys. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache.
+
+For UI sizing, the [sizing convenience API](../README.md) uses the same snapshots and bounded storage and owns its main-actor measurement recipe. The generic API described here has no main-actor requirement.
 
 ## Selecting dependencies
 
 ### Fixed schemas and explicit snapshots
 
-Use a small `Hashable` value struct for the inputs of one operation. `RequestKey<Operation, Dependencies, Context>` adds a nominal operation type, algorithm version, and environment. Declare a separate operation enum for unrelated calculations, including when storing requests in an `AnyHashable` dictionary. A free-form label does not separate operations.
+For a fixed schema, capture the inputs of one operation in a small `Hashable` value struct. `RequestKey<Operation, Dependencies, Context>` adds a nominal operation type, algorithm version, and environment. Declare a separate operation enum for unrelated calculations, including when storing requests in an `AnyHashable` dictionary. A free-form label does not separate operations.
 
 `OriginalKey` labels one captured value. `DerivedKey` labels a composition, and `KeyPair` holds two heterogeneous children without type erasure. Domain structs make larger fixed schemas readable. `KeyProjection` stores a reusable synchronous function from explicit input to dependencies:
 
@@ -30,7 +32,7 @@ Keep every value's equality and hashing stable for the lifetime of a key. `Hasha
 
 ### Runtime composition and live reads
 
-`KeySource<Input>` is an immutable graph recipe. Providers run when `snapshot(for:)` is called. Sources are deliberately not dictionary keys; `DependencySnapshot` contains the evaluated values and structure used in keys.
+`KeySource<Input>` describes an immutable graph of dependency reads. Its providers run when `snapshot(for:)` is called, producing a `DependencySnapshot` with the evaluated values and structure. Use that snapshot in a key; sources themselves are not dictionary keys.
 
 ```swift
 let text = KeySource<ExportInput>("text") { $0.text }
@@ -48,7 +50,7 @@ The closure convenience requires `@Sendable`, so an actor-isolated closure canno
 
 Providers must be synchronous, side-effect-free reads: no I/O, mutation, suspension, or recursive evaluation. Actor-isolated properties belong in an explicit snapshot captured by the actor before calling the source. Sources retain their providers, so avoid owner/source capture cycles; evaluated keys and cache entries do not retain those providers. A weak-owner adapter should represent a missing owner explicitly, never fabricate a valid dependency value.
 
-Each distinct source is read once per evaluation, even when shared by several parents. That memoization does not synchronize different properties or sources. Capture related state together, then calculate from the same snapshot without an intervening mutation. No change notification or `update()` call is needed. When values return A → B → A, the original key is restored.
+Each distinct source is read once per evaluation, even when shared by several parents. Reading each source once does not synchronize different properties or sources. Capture related state together, then calculate from the same snapshot without an intervening mutation. No change notification or `update()` call is needed. When values return A → B → A, the original key is restored.
 
 Composition preserves labels, original versus derived nodes, concrete value types, order, multiplicity, optional presence, and nested boundaries. Empty derived compositions are valid. `appending` returns a new derived source; rebinding a child variable does not change an existing composition. Build large collections with `init(_:children:)`: repeated appends copy the child array. Graph depth is limited to 64 nodes per path; construction throws beyond that bound. Immutable edges prevent graph cycles.
 
@@ -64,7 +66,7 @@ Typed keys and caches are `Sendable` only when their stored values are. Dynamic 
 
 ### UIKit cache ownership
 
-`DerivedKeysUIKit.LayoutCache` is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities.
+For UIKit layout, the separate `DerivedKeysUIKit` product provides `LayoutCache`. It is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities. See the [UIKit guide](UI-Measurement.md) for a complete layout request.
 
 ## Account for cache costs
 

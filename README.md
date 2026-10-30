@@ -17,27 +17,25 @@ Create caches once in a retained main-actor owner. The walkthrough starts with o
 
 ### Cache one measurement
 
-`DocumentContentView` below is an application type. Its `content` is a stable `Hashable` value—in the [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift), a `String`. `isExpanded` controls the line limit. The example fixes typography rules and the button title, and explicitly selects Dynamic Type. Declare any other inputs that can change measurement as dependencies.
+The UIKit convenience initializer calls `sizeThatFits(_:)` on the view passed to lookup. Select the properties that can change the measurement; keep all other measurement settings fixed.
 
-The example selects the application's stored content. If a separate model owns the text, select a key path such as `\.model.text`; the [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit.
+Here `view` is an application `DocumentContentView` that exposes its text and button controls. The [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift) fixes the text view's wrapping, insets, padding, and scrolling configuration.
 
 ```swift
 import DerivedKeysUI
 import UIKit
 
-let textSizes = SizeCache<DocumentContentView>(
-    dependingOn: \.content,
-    \.isExpanded,
-    \.traitCollection.preferredContentSizeCategory,
+let textSizes = SizeCache<UITextView>(
+    dependingOn: \.text,
+    \.font,
+    \.textContainer.maximumNumberOfLines,
     capacity: 256
-) { view, proposal in
-    view.textView.sizeThatFits(proposal)
-}
+)
 
-let size = textSizes.size(of: view, toFit: availableSize)
+let size = textSizes.size(of: view.textView, toFit: availableSize)
 ```
 
-The initializer binds the selected properties and measurement recipe. A lookup reads their current values and automatically includes **both fitting dimensions** in the key. It returns a cached result when the full request matches a stored entry. The root view is not part of the key, so different views can reuse a result through the same cache. Neither the view nor its properties need to be `Sendable`; selected values must be `Hashable` and stable.
+A lookup reads the selected values and automatically includes **both fitting dimensions** in the key. On a miss it calls the passed text view's `sizeThatFits(_:)` with the normalized proposal. The root view is not part of the key, so different views can reuse a result through the same cache. Selected values must be `Hashable` and stable; the root needs neither `Hashable` nor `Sendable` conformance.
 
 Use finite, nonnegative proposal dimensions; `CGFloat.greatestFiniteMagnitude` is supported for an unconstrained axis. See [fitting proposals](#fitting-proposals) for validation and normalization rules. A cache hit skips the recipe, so side effects that must run on every request belong outside it.
 
@@ -45,34 +43,35 @@ For a small view with one remembered size, an ordinary request struct and stored
 
 ### Compose a layout
 
-Add a button measurement, then declare both children when constructing the parent:
+Add a button measurement, then bind each leaf cache to its path from the parent. The bound handles both describe child dependencies and perform lookups through those same paths:
 
 ```swift
-let buttonSizes = SizeCache<DocumentContentView>(
-    dependingOn: \.traitCollection.preferredContentSizeCategory,
+let buttonSizes = SizeCache<UIButton>(
+    dependingOn: \.currentTitle,
+    \.titleLabel?.font,
     capacity: 256
-) { view, proposal in
-    view.button.sizeThatFits(proposal)
-}
+)
+let text = textSizes.bound(to: \DocumentContentView.textView)
+let button = buttonSizes.bound(to: \DocumentContentView.button)
 
 let contentSizes = SizeCache<DocumentContentView>(
     dependingOn: \.padding,
     \.spacing,
     \.showsButton,
-    children: textSizes, buttonSizes,
+    children: text, button,
     capacity: 256
 ) { view, proposal in
     let innerProposal = CGSize(
         width: max(0, proposal.width - 2 * view.padding),
         height: CGFloat.greatestFiniteMagnitude
     )
-    let text = textSizes.size(of: view, toFit: innerProposal)
-    let button = view.showsButton
-        ? buttonSizes.size(of: view, toFit: innerProposal)
+    let textSize = text.size(of: view, toFit: innerProposal)
+    let buttonSize = view.showsButton
+        ? button.size(of: view, toFit: innerProposal)
         : .zero
     return CGSize(
         width: proposal.width,
-        height: 2 * view.padding + text.height + button.height
+        height: 2 * view.padding + textSize.height + buttonSize.height
             + (view.showsButton ? view.spacing : 0)
     )
 }
@@ -84,13 +83,13 @@ view.content += " Another paragraph."
 let edited = contentSizes.size(of: view, toFit: availableSize) // Parent and text miss; button hits.
 ```
 
-The calculation captures the same child handles declared in `children:`. A parent hit skips its calculation and all child result lookups. A parent miss executes the calculation, whose child lookups can independently hit.
+The button's other measurement settings are fixed, including its configuration. The calculation captures the same bound handles declared in `children:`. A parent hit skips its calculation and all child result lookups. A parent miss executes the calculation, whose child lookups can independently hit.
 
 Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example intentionally computes natural height from the outer width. Every declared child participates in the parent snapshot, including a hidden button, so changes to an unused child can still cause a parent miss.
 
 ### Choose ownership
 
-Composition does not dictate ownership. A screen-owned bundle is a useful default when reusable views should share results. In this example, `DocumentSizeCaches` creates the two child caches once, uses those same handles to create the parent, and retains all three. Parent closures capture child handles rather than the bundle or a view.
+Composition does not dictate ownership. A screen-owned bundle is a useful default when reusable views should share results. In this example, `DocumentSizeCaches` retains the raw text and button caches plus the parent cache. Local bound handles connect the leaf caches to the parent and are captured by its calculation, without capturing the bundle or a view.
 
 ```swift
 @MainActor
@@ -114,11 +113,15 @@ final class DocumentScreen: UIViewController {
 }
 ```
 
-Inside `DocumentContentView`, `sizeThatFits(_:)` calls `caches.contentSizes.size(of: self, toFit: size)`. Its `layoutSubviews()` calls the retained child handles with the same inner proposal and assigns frames. The [complete bundle and view](Sources/DerivedKeysUIExample/DocumentContentView.swift) are compiled and tested together; they are application examples, not required base classes. The controls synchronize rendered text, line limits, and category-only fonts from the declared values before direct measurement. Changing a model does not automatically schedule layout or refit its container; the application remains responsible for both.
+Inside `DocumentContentView`, `sizeThatFits(_:)` calls `caches.contentSizes.size(of: self, toFit: size)`. Its `layoutSubviews()` calls the leaf caches with the corresponding controls and the same inner proposal, then assigns frames. The [complete bundle and view](Sources/DerivedKeysUIExample/DocumentContentView.swift) are compiled and tested together. They are application examples; no base class is required.
+
+The view updates rendered text and line limits at initialization and model changes, and fonts at initialization and trait changes. Its control getters only read stored controls. The cache does not schedule layout or refit the container. The example's model setters schedule layout; the application remains responsible for refitting.
 
 A view can instead own its own cache. An application can use a static cache when application-wide sharing is intentional. Separate instances own independent recipes and entries; assigning a cache reference shares its storage and recency. Keep configuration captured by a recipe fixed for its lifetime or select it as a dependency.
 
-The cache retains its configured measurement closure. User captures and reference-valued dependencies can retain views or owners; entries do not retain lookup roots implicitly. Child descriptions retain dependency-reading recipes, not child result storage, so capture the child handles the calculation needs. See [storage, lifetime, and clearing](#storage-lifetime-and-clearing) for entry retention and removal.
+The cache retains its configured measurement closure. User captures and reference-valued dependencies can retain views or owners; entries do not retain lookup roots implicitly.
+
+Bound lookup handles retain their original cache. Child descriptions retain only dependency readers, without retaining the cache, binding, or measurement closure. Capture the bound handles the calculation needs. See [storage, lifetime, and clearing](#storage-lifetime-and-clearing) for entry retention and removal.
 
 ### Nest layouts and map child roots
 
@@ -133,7 +136,13 @@ let outerSizes = SizeCache<DocumentContentView>(
 }
 ```
 
-For children with different root types, use `at(_:)` with a key path to the child's root, as shown in the [mapping example](Examples/Size-Caches.md#map-a-child-root). This maps a dependency description, without creating a cache or copying entries. The calculation calls each original cache with that same mapped root. Same-root and mapped children can be mixed, and one child can be mapped to two distinct paths. Each declared occurrence is read independently, so separate root bindings cannot accidentally share a traversal snapshot. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
+For children with different root types, `bound(to:)` creates a measurement handle for a nonoptional key path, as shown above and in the [mapping example](Examples/Size-Caches.md#map-a-child-root). Bindings can be chained through further parents. They reuse the original cache and add no storage, key identity, or snapshot depth.
+
+Use `at(_:)` when only a dependency description is needed; the parent calculation must call the original cache with the corresponding child root. Same-root and bound or mapped children can be mixed, and one child can be mapped to two distinct paths. Each declared occurrence is read independently, so separate root bindings cannot accidentally share a traversal snapshot. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
+
+### Use a custom measurement recipe
+
+The closure initializer remains available for proposal transforms, custom calculations, and authoritative model dependencies. For example, a parent-root cache can select `\.model.text` while measuring its synchronized text view. The [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit. Both initializers support zero selected dependencies; callers still own the completeness of the selected inputs.
 
 ## Install and import
 
@@ -173,11 +182,11 @@ Parents capture recursive dependency values even when child result storage is em
 
 Dependency composition is immutable and acyclic by construction. The checked limit is 64 snapshot nodes per path: an empty description has depth one, a description with a selected value has depth two, and each parent adds a level. Mapping adds no level. Excess depth fails a precondition.
 
-Reentering the same cache during its measurement, including count inspection or clearing, fails a precondition. Recursion through distinct child caches is supported, as in the [layout example](#compose-a-layout).
+Reentering the same cache during its measurement, including count inspection or clearing, fails a precondition. Do not call a native-fitting cache from the measured view's own `sizeThatFits(_:)` override: a miss calls that override again. Use a custom recipe for that integration. Recursion through distinct child caches is supported, as in the [layout example](#compose-a-layout).
 
 ### Storage, lifetime, and clearing
 
-`capacity` limits entries in each cache; zero disables storage. Successful lookups update LRU recency, and full caches evict their least recently used entry. Use `count`, `removeSize(of:toFit:)`, and `removeAll()` to inspect or clear local results. Removal selects the root's current dependencies and proposal.
+`capacity` limits entries in each cache; zero disables storage. Successful lookups update LRU recency, and full caches evict their least recently used entry. Use `count`, `removeSize(of:toFit:)`, and `removeAll()` to inspect or clear local results. Removal selects the root's current dependencies and proposal. Bound handles expose measurement and dependency composition only; inspect or clear the original cache.
 
 Clearing a parent leaves its children intact. Clearing or evicting a child leaves otherwise valid parent results intact. Previous input states can reuse retained entries when they return. If an undeclared external change requires clearing, clear **every affected result cache**, or represent that change as a dependency. There is no recursive clearing or shared eviction budget.
 

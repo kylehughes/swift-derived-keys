@@ -1,10 +1,12 @@
 # UIKit sizing results
 
+This is a historical recipe-based run, predating the native-fitting leaf caches and bound parent handles. Its document children selected parent-root model dependencies and configured controls through getters. The current example and methodology have since moved to actual-control dependencies and eager configuration; these timings do not measure that implementation. The recorded source fingerprints remain the provenance for this sample. See the [native-fitting results](UIKit-Native-Fitting-Results.md) for the updated example.
+
 In this **iOS Simulator** sample, caching substantially reduces repeated sizing time for the document example: a warm composed parent takes **6.00 µs** through DerivedKeys versus **271.91 µs** for direct child fitting and combination. A parent-only spacing change takes **12.88 versus 322.38 µs**, reusing both child measurements. Caching is a poor fit for the already-warm labels here: direct fitting takes about **0.11 µs**, while a cache hit takes **3.80–4.04 µs**.
 
 Shared results help the multiline and attributed label pools, but not the single-line pool. The mixed-request results are less decisive: the document parent's median time is about 7% lower with caching, while `UITextView`'s is about 5% higher. Several mixed rows have overlapping ranges or inconsistent paired wins. Choose caching for the application's avoided work and reuse rate, not simply because it reduces measurement calls.
 
-These are one Simulator run's observations, recorded on 2026-10-28. **No physical-device results are reported.** Read the [methodology and reproduction commands](README.md) with these results; the [raw trials, diagnostics, and source fingerprints](Measurements/UIKit-2026-10-28.json) are included.
+These observations come from one Simulator run, recorded on 2026-10-28. **No physical-device results are reported.** The [raw trials, diagnostics, and source fingerprints](Measurements/UIKit-2026-10-28.json) preserve this run. The [benchmark guide](README.md) describes the current methodology and reproduction commands; the timing boundaries below describe this historical run.
 
 ## Environment and timing boundaries
 
@@ -165,6 +167,6 @@ The [string-representation follow-up](String-Results.md) compares the UIKit gett
 
 ## Scope and reproducibility
 
-Run `python3 Benchmarks/run-uikit.py` with the documented toolchain to repeat this Simulator sample. The current tool-hosted package scheme cannot execute on a physical device without a host application; see the [runner limitation](README.md#run-on-a-device-or-simulator). The [XCTest fixture](../Tests/DerivedKeysUIExampleTests/UIKitSizingBenchmarkTests.swift) contains the exact strings, attributes, configuration, request order, and assertions. This run used the source fingerprints in the raw JSON, on top of `7adad7c311ab773fa234f4788badb345ea9ee91e` with uncommitted changes.
+Run `python3 Benchmarks/run-uikit.py` with the documented toolchain to collect a new Simulator sample of the current implementation. The current tool-hosted package scheme cannot execute on a physical device without a host application; see the [runner limitation](README.md#run-on-a-device-or-simulator). The current [XCTest fixture](../Tests/DerivedKeysUIExampleTests/UIKitSizingBenchmarkTests.swift) has evolved since this run; it is not an exact historical source snapshot. This run used the source fingerprints in the raw JSON, on top of `7adad7c311ab773fa234f4788badb345ea9ee91e` with uncommitted changes.
 
 The final runner validated one executed XCTest case, all 36 primary rows, all 17 diagnostic rows, checksums, result equivalence, and cache observations. It retained the xcresult and command logs and deleted its owned Simulator. No other build or benchmark job ran concurrently with the timed run. Background system load, thermal state, and power conditions were not controlled; several ranges are wide. No statistical significance, allocation count, or memory measurement is claimed. Simulator CPU timings cannot establish physical-device or scrolling performance.

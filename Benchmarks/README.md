@@ -1,6 +1,11 @@
 # UIKit sizing benchmarks
 
-These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Start with the [sizing and composition results](UIKit-Results.md), then the [UIKit versus model string results](String-Results.md) for the text-view lookup investigation. Both reports contain Simulator measurements. Use the [synthetic diagnostics](Synthetic.md) to investigate key and storage costs separately.
+These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Choose a report for the question you want to investigate:
+
+- [Native fitting and composition](UIKit-Native-Fitting-Results.md): Simulator measurements of the current document example. Start here for application sizing.
+- [UIKit versus model strings](String-Results.md): a Simulator investigation of text-view lookup costs.
+- [Earlier recipe-based run](UIKit-Results.md): historical sizing evidence from the earlier example.
+- [Synthetic diagnostics](Synthetic.md): key and storage costs measured separately from UIKit fitting.
 
 A cache hit still reads dependencies and hashes and compares their snapshots. It helps when that work costs less than the measurement it avoids, often enough to cover misses and eviction. Fewer measurement calls alone do not establish a speedup.
 
@@ -24,7 +29,7 @@ Run the focused string-representation comparison with:
 python3 Benchmarks/run-uikit.py --suite strings
 ```
 
-This suite uses a fixed 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation. The following workload description covers the default sizing suite.
+The string suite uses a fixed 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation.
 
 The output includes the raw XCTest result, JSON attachment, commands, toolchain and destination metadata, candidate source fingerprints, and a receipt. The runner fails if tests are missing, comparisons fail, observations are incomplete, or source files change during execution. Its parser controls are available with:
 
@@ -34,17 +39,17 @@ python3 Benchmarks/test-run-uikit.py
 
 ## What is measured
 
-All UIKit work runs synchronously on the main actor. Composed-document timings cover child sizing and final-size combination; frame assignment, drawing, and scrolling are outside this harness. The suite uses actual controls and the current [document example](../Sources/DerivedKeysUIExample/DocumentContentView.swift):
+The following workload description covers the default sizing suite. All UIKit work runs synchronously on the main actor. Composed-document timings cover child sizing and final-size combination; frame assignment, drawing, and scrolling are outside this harness. The suite uses actual controls and the current [document example](../Sources/DerivedKeysUIExample/DocumentContentView.swift):
 
 | Workload | Selected values and configuration |
 | --- | --- |
 | Single-line and multiline `UILabel` | Ordinary `text`, `font`, `numberOfLines`, and `lineBreakMode` key paths; fixed left-to-right direction. |
 | Attributed `UILabel` | Immutable `attributedText`, `font`, line count, and line-break mode; bold opening text, line spacing, and kerning. |
 | `UITextView` | Ordinary text and font dependencies; scrolling, editing, and selection disabled; fixed text-container insets and padding. |
-| Document text and button | The actual `DocumentSizeCaches.textSizes` and `buttonSizes` handles, including the example's synchronization of rendered controls. |
+| Document text and button | The actual `DocumentSizeCaches.textSizes` and `buttonSizes` handles, selecting text, font, and maximum line count for the text view, and current title and title font for the button. |
 | Composed document | The actual parent cache, with the same child handles, proposal transformation, and combination used by the application example. |
 
-Inputs include a short title, a multiline paragraph, long text, and attributed content. Standalone controls use 17-, 24-, and 32-point fonts. Document views use the example's body font with large, accessibility-medium, and accessibility-extra-extra-extra-large content-size categories. Outer widths are 180 and 320 points. The document parent subtracts its fixed 12-point padding on each side; child fitting height is unconstrained. All other measurement settings are fixed for the recipe's lifetime.
+Inputs include a short title, a multiline paragraph, long text, and attributed content. Standalone controls use 17-, 24-, and 32-point fonts. Document views use the example's body font with large, accessibility-medium, and accessibility-extra-extra-extra-large content-size categories. Outer widths are 180 and 320 points. The document parent subtracts its fixed 12-point padding on each side; child fitting height is unconstrained. All other measurement settings are fixed for the recipe's lifetime. Document controls are configured eagerly at initialization and model or trait changes; getters only read controls.
 
 Prepared strings, standalone fonts, immutable attributed inputs, request traces, view creation, and result-buffer allocation are outside timing. The mixed trace uses 40 prepared semantic variants; callers still use ordinary UIKit key paths, with no custom dependency wrapper or aggregate sizing-input type.
 
@@ -62,9 +67,11 @@ Prepared strings, standalone fonts, immutable attributed inputs, request traces,
 
 Warm and equivalent-view rows are **measurement-only**: controls are configured before timing. Direct document measurements retain the configured controls and call their UIKit fitting methods without reassigning their content in the loop. This preserves UIKit's own warm behavior.
 
-Changing rows include the applicable configuration work in both arms. A width change updates the proposal; a spacing change assigns spacing; content/font changes assign the same prepared values. Document measurements use the example's synchronized getters when requesting a child. Those rows include the getters' cost. The parent-only row changes no child input, though a direct measurement still performs the example's child access and fitting.
+Changing rows include the applicable configuration work in both arms. Content/font changes assign the same prepared values, eagerly synchronizing document controls in both arms. Document content/font and mixed rows configure the whole document, even when measuring only its button; those rows include text assignment and category propagation, not just button work.
 
-Each trial creates independent direct and cached fixture sets. Warmup primes the cached entry before the final direct UIKit warmup, so synchronizing the example controls does not accidentally invalidate the direct baseline afterward. There are four direct warmup calls per warmed view; equivalent-view rows warm only their separate seed. Arm order alternates between trials. Both arms write their returned sizes into preallocated buffers; comparison, diagnostics, serialization, and attachment creation occur afterward. Loop and timer overhead are not subtracted.
+Width changes update only proposals, and spacing changes update only spacing; neither operation hides control configuration in a getter or setter. The parent-only row changes no child input, though a direct measurement still accesses and fits the children.
+
+Each trial creates independent direct and cached fixture sets. Warmup primes the cached entry before the final direct UIKit warmup, so configuration does not accidentally invalidate the direct baseline afterward. There are four direct warmup calls per warmed view; equivalent-view rows warm only their separate seed. Arm order alternates between trials. Both arms write their returned sizes into preallocated buffers; comparison, diagnostics, serialization, and attachment creation occur afterward. Loop and timer overhead are not subtracted.
 
 ### Results and cache observations
 

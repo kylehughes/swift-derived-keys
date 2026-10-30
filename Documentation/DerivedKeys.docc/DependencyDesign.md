@@ -1,6 +1,6 @@
 # Choosing complete dependencies
 
-Capture the inputs that determine one calculation, and preserve their meaning for as long as the key is retained.
+Use this guide to choose the inputs for a generic `DerivedKeys` request. Capture the inputs that determine one calculation, and preserve their meaning for as long as the key is retained. Equal keys must imply interchangeable results.
 
 ## Start with the calculation
 
@@ -10,11 +10,11 @@ A distinct operation enum supplies a nominal namespace through ``RequestKey``. U
 
 ## Capture once, then calculate
 
-Pass an immutable input to ``KeyProjection`` or ``KeySource/snapshot(for:)`` and use that input in the cache's miss closure. Reading individually synchronized properties at different times does not establish a coherent request. Capture related state together within its mutation owner, or keep evaluation and calculation in one non-suspending operation in that owner's isolation.
+Capture an immutable input, pass it to ``KeyProjection`` or ``KeySource/snapshot(for:)``, and calculate from the same input in the cache's miss closure. Reading individually synchronized properties at different times does not establish a coherent request. Capture related state together within its mutation owner, or keep evaluation and calculation in one non-suspending operation in that owner's isolation.
 
 Live providers execute synchronously during source evaluation. Closure providers are `@Sendable`; a non-Sendable reader can conform to ``KeyValueProvider`` instead, whose synchronous read is explicitly nonisolated. Actor-owned state belongs in an explicit input snapshot captured by the actor. Providers must perform side-effect-free reads without I/O, suspension, mutation, or recursive evaluation. Shared sources are captured once per request; memoization identity never contributes to semantic equality. Different source instances with equal schemas and values produce equal snapshots.
 
-The source retains its provider, including any objects the provider captures strongly. The snapshot owns values and structure, and the cache owns keys and results. Prefer explicit inputs to avoid retaining a model through a source. A weak capture must distinguish owner disappearance from a valid dependency. None of these abstractions deep-copy arbitrary references: capture immutable content instead of a mutable `Hashable` object.
+The source retains its provider, including any objects the provider captures strongly. The evaluated snapshot owns values and structure, and the cache owns keys and results. Prefer explicit inputs to avoid retaining a model through a source. A weak capture must distinguish owner disappearance from a valid dependency. None of these abstractions deep-copy arbitrary references: capture immutable content instead of a mutable `Hashable` object.
 
 Typed snapshots and caches transfer only when their components are `Sendable`. Erased snapshots and source recipes deliberately do not promise transfer safety. The generic module is nonisolated; a UI adapter captures and measures within the main actor.
 
@@ -26,7 +26,7 @@ Never use a finalized integer hash as a semantic key. Collisions are legal, and 
 
 ## Compose captured values directly
 
-``DependencySnapshot/init(value:)`` retains a full hashable value and its concrete type. ``DependencySnapshot/init(children:)`` composes already captured snapshots in order, with the same 64-node depth bound. These unlabeled forms use empty labels and compare equal to equivalent empty-label source snapshots. They are useful when the caller already owns selection and isolation; the core adds no UI or global-actor dependency.
+``DependencySnapshot/init(value:)`` retains a full hashable value and its concrete type. ``DependencySnapshot/init(children:)`` composes already captured snapshots in order, with the same 64-node depth bound. These unlabeled forms use empty labels and compare equal to equivalent empty-label source snapshots. Use them when the caller already controls dependency selection and isolation; the core adds no UI or global-actor dependency.
 
 The sizing facade in `DerivedKeysUI` captures main-actor key-path values into this representation. Its traversal evaluates each declared occurrence independently, including mapped bindings; that differs from `KeySource`'s request-local shared-node memoization. Both preserve complete values and structure.
 
