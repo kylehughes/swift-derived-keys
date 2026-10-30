@@ -129,8 +129,10 @@ jobs:
             # Retained job logs identify intent before the first write. Never retry a
             # write automatically: inspect the remote and stop on an unknown outcome.
             print(json.dumps({"tag": tag, "candidate": candidate, "asset": archive.name, "sha256": digest}), flush=True)
+            prerelease = "-" in tag.split("+", 1)[0]
             body = {"tag_name": tag, "target_commitish": candidate, "name": tag,
-                    "body": notes, "draft": True, "generate_release_notes": generated}
+                    "body": notes, "draft": True, "prerelease": prerelease,
+                    "generate_release_notes": generated}
             try:
                 release = api("POST", "/releases", body)
             except Unknown:
@@ -139,7 +141,8 @@ jobs:
                 print(json.dumps({"inspection": matches}), flush=True)
                 raise Unknown("Release creation response uncertain; inspect retained state before another write")
             release_id = release["id"]
-            if release.get("tag_name") != tag or not release.get("draft") or release.get("target_commitish") != candidate:
+            if (release.get("tag_name") != tag or not release.get("draft")
+                    or release.get("target_commitish") != candidate or release.get("prerelease") is not prerelease):
                 raise Unknown("Created release identity mismatch; inspect before another write")
             try:
                 asset = api("POST", f"/releases/{release_id}/assets?name=" + urllib.parse.quote(archive.name), payload, upload=True)
@@ -151,13 +154,15 @@ jobs:
             if asset.get("name") != archive.name or asset.get("size") != len(payload) or asset.get("digest") != "sha256:" + digest:
                 raise Unknown("Uploaded asset identity unverified; inspect before another write")
             try:
-                result = api("PATCH", f"/releases/{release_id}", {"draft": False})
+                result = api("PATCH", f"/releases/{release_id}", {"draft": False, "prerelease": prerelease})
             except Unknown:
                 result = api("GET", f"/releases/{release_id}")
-                if result.get("draft") is not False or result.get("tag_name") != tag:
+                if (result.get("draft") is not False or result.get("tag_name") != tag
+                        or result.get("prerelease") is not prerelease):
                     raise Unknown("Publication remains unknown; stop and inspect")
             remote_tag = api("GET", "/git/ref/tags/" + urllib.parse.quote(tag, safe=""))
             if (result.get("draft") is not False or result.get("tag_name") != tag
+                    or result.get("prerelease") is not prerelease
                     or remote_tag.get("object", {}).get("sha") != candidate):
                 raise Unknown("Published release/tag identity is unverified")
             print(json.dumps({"release": result["html_url"], "asset_sha256": digest}), flush=True)
@@ -231,6 +236,9 @@ jobs:
     - name: Test selected release cases
       run: python3 Scripts/check-tests.py --configuration release
       timeout-minutes: 15
+    - name: Release workflow controls
+      run: python3 Scripts/test-release.py
+      timeout-minutes: 5
     - name: Simulator observation controls
       run: python3 Scripts/test-check-simulator.py
       timeout-minutes: 5
@@ -380,8 +388,10 @@ jobs:
             # Retained job logs identify intent before the first write. Never retry a
             # write automatically: inspect the remote and stop on an unknown outcome.
             print(json.dumps({"tag": tag, "candidate": candidate, "asset": archive.name, "sha256": digest}), flush=True)
+            prerelease = "-" in tag.split("+", 1)[0]
             body = {"tag_name": tag, "target_commitish": candidate, "name": tag,
-                    "body": notes, "draft": True, "generate_release_notes": generated}
+                    "body": notes, "draft": True, "prerelease": prerelease,
+                    "generate_release_notes": generated}
             try:
                 release = api("POST", "/releases", body)
             except Unknown:
@@ -390,7 +400,8 @@ jobs:
                 print(json.dumps({"inspection": matches}), flush=True)
                 raise Unknown("Release creation response uncertain; inspect retained state before another write")
             release_id = release["id"]
-            if release.get("tag_name") != tag or not release.get("draft") or release.get("target_commitish") != candidate:
+            if (release.get("tag_name") != tag or not release.get("draft")
+                    or release.get("target_commitish") != candidate or release.get("prerelease") is not prerelease):
                 raise Unknown("Created release identity mismatch; inspect before another write")
             try:
                 asset = api("POST", f"/releases/{release_id}/assets?name=" + urllib.parse.quote(archive.name), payload, upload=True)
@@ -402,13 +413,15 @@ jobs:
             if asset.get("name") != archive.name or asset.get("size") != len(payload) or asset.get("digest") != "sha256:" + digest:
                 raise Unknown("Uploaded asset identity unverified; inspect before another write")
             try:
-                result = api("PATCH", f"/releases/{release_id}", {"draft": False})
+                result = api("PATCH", f"/releases/{release_id}", {"draft": False, "prerelease": prerelease})
             except Unknown:
                 result = api("GET", f"/releases/{release_id}")
-                if result.get("draft") is not False or result.get("tag_name") != tag:
+                if (result.get("draft") is not False or result.get("tag_name") != tag
+                        or result.get("prerelease") is not prerelease):
                     raise Unknown("Publication remains unknown; stop and inspect")
             remote_tag = api("GET", "/git/ref/tags/" + urllib.parse.quote(tag, safe=""))
             if (result.get("draft") is not False or result.get("tag_name") != tag
+                    or result.get("prerelease") is not prerelease
                     or remote_tag.get("object", {}).get("sha") != candidate):
                 raise Unknown("Published release/tag identity is unverified")
             print(json.dumps({"release": result["html_url"], "asset_sha256": digest}), flush=True)

@@ -14,6 +14,7 @@ python3 Scripts/check-tests.py
 python3 Scripts/check-tests.py --configuration release
 python3 Scripts/check-concurrency.py --warnings-policy
 python3 Scripts/check-preconditions.py
+python3 Scripts/test-release.py
 python3 Scripts/test-check-simulator.py
 python3 Scripts/check-simulator.py
 swift format lint --strict --recursive Package.swift Sources Tests
