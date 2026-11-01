@@ -71,7 +71,7 @@ public final class LabelView: UIView {
     ///
     /// A finite nonnegative width is filled exactly. The greatest-finite-magnitude
     /// sentinel requests natural width. Invalid widths return zero without caching.
-    /// Widths smaller than the padding leave a zero-width label and padding-only height.
+    /// Widths at or below twice the padding leave a zero-width label and padding-only height.
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
         layout(forWidth: size.width)?.size ?? .zero
     }

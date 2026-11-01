@@ -4,10 +4,11 @@
 expansion button. It is a non-product example target that runs inside this
 repository and demonstrates explicit composition of child dependency keys.
 
-To integrate your own view in an app, start with the [UIKit guide](UI-Measurement.md)
-and the supported `DerivedKeysUIKit` product. The [size-cache guide](Size-Caches.md)
-covers the key-path sizing facade. The generic `DerivedKeys` library has no UIKit
-dependency; UIKit declarations and tests use `#if canImport(UIKit)`.
+For ordinary view sizing in an app, start with the [size-cache guide](Size-Caches.md)
+and the `DerivedKeysUI` product. This secondary example demonstrates explicit-input
+composition; the [UIKit guide](UI-Measurement.md) explains that alternative using
+the supported `DerivedKeysUIKit` product. The generic `DerivedKeys` library has no
+UIKit dependency; UIKit declarations and tests use `#if canImport(UIKit)`.
 
 ```swift
 import DerivedKeysUIExample

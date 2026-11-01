@@ -43,7 +43,9 @@ For a small view with one remembered size, an ordinary request struct and stored
 
 ### Compose a layout
 
-Add a button measurement, then bind each leaf cache to its path from the parent. The bound handles both describe child dependencies and perform lookups through those same paths:
+Add a button measurement, then bind each child cache to its path in the parent. Use those same handles in the layout calculation.
+
+Both `textSizing` and `buttonSizing` have type `SizeCacheBinding<DocumentContentView>`. They read child dependencies and look up sizes through their selected paths using the original caches. Their `size(of:toFit:)` calls therefore take the parent content view:
 
 ```swift
 let buttonSizes = SizeCache<UIButton>(
@@ -51,28 +53,28 @@ let buttonSizes = SizeCache<UIButton>(
     \.titleLabel?.font,
     capacity: 256
 )
-let text = textSizes.bound(to: \DocumentContentView.textView)
-let button = buttonSizes.bound(to: \DocumentContentView.button)
+let textSizing = textSizes.bound(to: \DocumentContentView.textView)
+let buttonSizing = buttonSizes.bound(to: \DocumentContentView.button)
 
 let contentSizes = SizeCache<DocumentContentView>(
     dependingOn: \.padding,
     \.spacing,
     \.showsButton,
-    children: text, button,
+    children: textSizing, buttonSizing,
     capacity: 256
-) { view, proposal in
+) { content, proposal in
     let innerProposal = CGSize(
-        width: max(0, proposal.width - 2 * view.padding),
+        width: max(0, proposal.width - 2 * content.padding),
         height: CGFloat.greatestFiniteMagnitude
     )
-    let textSize = text.size(of: view, toFit: innerProposal)
-    let buttonSize = view.showsButton
-        ? button.size(of: view, toFit: innerProposal)
+    let textSize = textSizing.size(of: content, toFit: innerProposal)
+    let buttonSize = content.showsButton
+        ? buttonSizing.size(of: content, toFit: innerProposal)
         : .zero
     return CGSize(
         width: proposal.width,
-        height: 2 * view.padding + textSize.height + buttonSize.height
-            + (view.showsButton ? view.spacing : 0)
+        height: 2 * content.padding + textSize.height + buttonSize.height
+            + (content.showsButton ? content.spacing : 0)
     )
 }
 
@@ -131,8 +133,8 @@ The same composition works beyond one layout level. Parents can themselves be ch
 let outerSizes = SizeCache<DocumentContentView>(
     children: contentSizes,
     capacity: 256
-) { view, proposal in
-    contentSizes.size(of: view, toFit: proposal)
+) { content, proposal in
+    contentSizes.size(of: content, toFit: proposal)
 }
 ```
 
@@ -206,7 +208,7 @@ Use the [generic API guide](Examples/Generic-Core.md) for typed keys, `KeyProjec
 | Look up the sizing API | [SizeCache reference](Documentation/DerivedKeysUI.docc/DerivedKeysUI.md) |
 | Cache child frames as well as the overall size | [Explicit layout results](Examples/UI-Measurement.md) |
 | Choose dependencies for a non-UI computation | [Core dependency design](Documentation/DerivedKeys.docc/DependencyDesign.md) |
-| Evaluate cache costs | [Release benchmarks](Benchmarks/README.md), with workloads, measured results, and allocation limits |
+| Evaluate cache costs | [Release benchmarks](Benchmarks/README.md), with workloads, measured results, and measurement limits |
 | Build, test, or maintain the package | [Tests and maintenance](Documentation/Maintenance.md), including iOS 16 compiler checks, precondition probes, and Simulator execution |
 
 ## Contributions

@@ -38,6 +38,8 @@ The [UIKit performance runner](../Benchmarks/README.md) runs XCTest benchmark fi
 
 ## Inspect generated documentation
 
+The documentation command extracts macOS and iOS 16 Simulator symbol graphs using the selected Xcode and its Simulator SDK. DocC combines both graph sets so the reference includes UIKit-only APIs alongside the macOS surface. The build fails if a module page, either `SizeCache` initializer page, or the native initializer's `Root: UIView` constraint is missing.
+
 The static site's entry is `/swift-derived-keys/documentation/`; its module pages are `derivedkeys/`, `derivedkeysui/`, and `derivedkeysuikit/` beneath it. Serve the output beneath `/swift-derived-keys/` to check deep links and assets. A build does not deploy documentation.
 
 ## Hosted workflows

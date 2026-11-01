@@ -121,7 +121,7 @@ The required baseline is **pull on evaluation**:
 4. Look up that key.
 5. On a miss, calculate from the same captured inputs and store the result under that key.
 
-The original concept reevaluates provider closures when a hash is read. Preserve that ability. Do not introduce a requirement to send change notifications before a later lookup can observe changed state.
+Reevaluate providers when a new snapshot is requested. Hashing an existing snapshot reads only its captured values. Do not introduce a requirement to send change notifications before a later lookup can observe changed state.
 
 Provide an explicit-input path, such as a projection from an immutable input snapshot, as the preferred way to maintain consistency and avoid retaining a model owner. A live provider adapter may capture current state within its owner's isolation and then use the same path.
 

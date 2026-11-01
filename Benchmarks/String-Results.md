@@ -4,7 +4,7 @@ Select an authoritative Swift model value when the application already owns and 
 
 Per-request `makeContiguousUTF8()` reduces that warm lookup to **36.70 µs**, but its getter and conversion phase alone takes **33.02 µs**. This is a diagnostic alternative, not a recommendation to normalize every dependency automatically. Hashing model text still has a cost: the long non-ASCII string takes **7.80 µs** in the string-only phase. See the [authoritative-model selection guide](../Examples/Size-Caches.md#select-authoritative-model-text) for the synchronization contract.
 
-This run was recorded on 2026-10-28 local time (2026-10-29 UTC). **No physical-device measurements are available.** The [full benchmark guide](README.md) describes reproduction and dependency selection; the [raw trials and source fingerprints](Measurements/UIKit-Strings-2026-10-28-Simulator.json) preserve this run. The existing [UIKit sizing results](UIKit-Results.md) remain a separate baseline for labels, text views, and composed document sizing; this string fixture does not update those results.
+This run was recorded on 2026-10-28 local time (2026-10-29 UTC). **No physical-device measurements are available.** The [full benchmark guide](README.md) describes reproduction and dependency selection; the [raw trials and source fingerprints](Measurements/UIKit-Strings-2026-10-28-Simulator.json) preserve this run. For current label, text-view, and composed document sizing results, see the [native-fitting report](UIKit-Native-Fitting-Results.md). The earlier [UIKit sizing results](UIKit-Results.md) remain a separate historical baseline; this string fixture does not update either sizing report.
 
 ## Compared paths and timing boundaries
 

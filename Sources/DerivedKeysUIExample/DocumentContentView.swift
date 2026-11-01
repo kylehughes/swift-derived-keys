@@ -28,26 +28,26 @@ public final class DocumentSizeCaches {
             \.titleLabel?.font,
             capacity: capacity
         )
-        let text = textSizes.bound(to: \DocumentContentView.textView)
-        let button = buttonSizes.bound(to: \DocumentContentView.button)
+        let textSizing = textSizes.bound(to: \DocumentContentView.textView)
+        let buttonSizing = buttonSizes.bound(to: \DocumentContentView.button)
         self.textSizes = textSizes
         self.buttonSizes = buttonSizes
         contentSizes = SizeCache<DocumentContentView>(
             dependingOn: \.padding,
             \.spacing,
             \.showsButton,
-            children: text,
-            button,
+            children: textSizing,
+            buttonSizing,
             capacity: capacity
-        ) { view, proposal in
+        ) { content, proposal in
             let innerProposal = CGSize(
-                width: max(0, proposal.width - 2 * view.padding),
+                width: max(0, proposal.width - 2 * content.padding),
                 height: CGFloat.greatestFiniteMagnitude
             )
-            let textSize = text.size(of: view, toFit: innerProposal)
-            let buttonHeight = view.showsButton ? button.size(of: view, toFit: innerProposal).height : 0
-            let gap = view.showsButton ? view.spacing : 0
-            return CGSize(width: proposal.width, height: 2 * view.padding + textSize.height + gap + buttonHeight)
+            let textSize = textSizing.size(of: content, toFit: innerProposal)
+            let buttonHeight = content.showsButton ? buttonSizing.size(of: content, toFit: innerProposal).height : 0
+            let gap = content.showsButton ? content.spacing : 0
+            return CGSize(width: proposal.width, height: 2 * content.padding + textSize.height + gap + buttonHeight)
         }
     }
 }

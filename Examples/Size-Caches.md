@@ -6,7 +6,7 @@ Start with the [README](../README.md) for one measurement and a composed text/bu
 
 ## Map a child root
 
-A child can measure a nested root. `bound(to:)` creates a handle that both describes dependencies and looks up measurements through the selected path. This label recipe assumes every other measurement setting is fixed:
+A child can measure a nested root. Bind its cache to a path in the parent, then use that handle for both dependency capture and measurement. Here `titleSizing` and `subtitleSizing` are `SizeCacheBinding<PairView>` handles that share the original label cache. Each accepts the parent pair and follows its path to the corresponding label. This label recipe assumes every other measurement setting is fixed:
 
 ```swift
 import DerivedKeysUI
@@ -24,15 +24,15 @@ final class PairView: UIView {
 }
 
 @MainActor
-func makePairSizes(titles: SizeCache<UILabel>) -> SizeCache<PairView> {
-    let title = titles.bound(to: \PairView.title)
-    let subtitle = titles.bound(to: \PairView.subtitle)
+func makePairSizes(titleSizes: SizeCache<UILabel>) -> SizeCache<PairView> {
+    let titleSizing = titleSizes.bound(to: \PairView.title)
+    let subtitleSizing = titleSizes.bound(to: \PairView.subtitle)
     return SizeCache<PairView>(
-        children: title, subtitle,
+        children: titleSizing, subtitleSizing,
         capacity: 128
-    ) { view, proposal in
-        let titleSize = title.size(of: view, toFit: proposal)
-        let subtitleSize = subtitle.size(of: view, toFit: proposal)
+    ) { pair, proposal in
+        let titleSize = titleSizing.size(of: pair, toFit: proposal)
+        let subtitleSize = subtitleSizing.size(of: pair, toFit: proposal)
         return CGSize(
             width: max(titleSize.width, subtitleSize.width),
             height: titleSize.height + subtitleSize.height
@@ -63,7 +63,7 @@ Each cache has its own capacity and LRU order. A view-owned cache and an intenti
 
 Descriptions retain dependency readers only, without retaining the cache, bound lookup handle, or measurement closure. The parent closure must retain any child handle it will call.
 
-For dependency-only mapping, use `child.at(\PairView.title)` and call `child.size(of: view.title, toFit: proposal)` in the calculation. Unlike a bound lookup handle, that descriptor does not retain the original cache, its measurement closure, or entries.
+For dependency-only mapping, use `titleSizes.at(\PairView.title)` and call `titleSizes.size(of: pair.title, toFit: proposal)` in the calculation. Unlike a bound lookup handle, that descriptor does not retain the original cache, its measurement closure, or entries.
 
 Cached entries contain captured values and `CGSize` results; the root supplied to `size(of:toFit:)` is not implicitly retained. Explicit user captures or reference-valued dependencies can still retain a root or owner.
 

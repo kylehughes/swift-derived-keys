@@ -24,7 +24,7 @@ Finite nonnegative values are accepted, including the greatest finite value as a
 
 ## Compose child measurements
 
-Pass child caches in `children:` when creating a parent. A parent hit skips its calculation and every child result lookup. A parent miss runs the configured calculation, where each child lookup can independently hit. Transform proposals in the calculation and declare any values that affect the transformation. Children key the actual proposals they receive. All declared children participate in the dependency snapshot even when a branch will not measure them.
+Pass child caches in `children:` when creating a parent with the closure initializer. The native UIKit convenience initializer has no child list. A parent hit skips its calculation and every child result lookup. A parent miss runs the configured calculation, where each child lookup can independently hit. Transform proposals in the calculation and declare any values that affect the transformation. Children key the actual proposals they receive. All declared children participate in the dependency snapshot even when a branch will not measure them.
 
 Use `child.bound(to: \Parent.child)` for a child with a different root type. The resulting ``SizeCacheBinding`` is a main-actor dependency description and measurement handle: pass it in `children:` and capture it to call `size(of:toFit:)` with the parent root. Bindings can be chained, and distinct root bindings are traversed independently.
 

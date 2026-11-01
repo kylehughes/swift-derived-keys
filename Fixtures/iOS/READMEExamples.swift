@@ -19,30 +19,30 @@ func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
         \.titleLabel?.font,
         capacity: 256
     )
-    let text = textSizes.bound(to: \DocumentContentView.textView)
-    let button = buttonSizes.bound(to: \DocumentContentView.button)
+    let textSizing = textSizes.bound(to: \DocumentContentView.textView)
+    let buttonSizing = buttonSizes.bound(to: \DocumentContentView.button)
 
     let contentSizes = SizeCache<DocumentContentView>(
         dependingOn: \.padding,
         \.spacing,
         \.showsButton,
-        children: text,
-        button,
+        children: textSizing,
+        buttonSizing,
         capacity: 256
-    ) { view, proposal in
+    ) { content, proposal in
         let innerProposal = CGSize(
-            width: max(0, proposal.width - 2 * view.padding),
+            width: max(0, proposal.width - 2 * content.padding),
             height: CGFloat.greatestFiniteMagnitude
         )
-        let textSize = text.size(of: view, toFit: innerProposal)
+        let textSize = textSizing.size(of: content, toFit: innerProposal)
         let buttonSize =
-            view.showsButton
-            ? button.size(of: view, toFit: innerProposal)
+            content.showsButton
+            ? buttonSizing.size(of: content, toFit: innerProposal)
             : .zero
         return CGSize(
             width: proposal.width,
-            height: 2 * view.padding + textSize.height + buttonSize.height
-                + (view.showsButton ? view.spacing : 0)
+            height: 2 * content.padding + textSize.height + buttonSize.height
+                + (content.showsButton ? content.spacing : 0)
         )
     }
 
@@ -55,8 +55,8 @@ func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
     let outerSizes = SizeCache<DocumentContentView>(
         children: contentSizes,
         capacity: 256
-    ) { view, proposal in
-        contentSizes.size(of: view, toFit: proposal)
+    ) { content, proposal in
+        contentSizes.size(of: content, toFit: proposal)
     }
 
     _ = (size, initial, spaced, edited, outerSizes)
@@ -97,16 +97,16 @@ final class PairView: UIView {
 }
 
 @MainActor
-func makePairSizes(titles: SizeCache<UILabel>) -> SizeCache<PairView> {
-    let title = titles.bound(to: \PairView.title)
-    let subtitle = titles.bound(to: \PairView.subtitle)
+func makePairSizes(titleSizes: SizeCache<UILabel>) -> SizeCache<PairView> {
+    let titleSizing = titleSizes.bound(to: \PairView.title)
+    let subtitleSizing = titleSizes.bound(to: \PairView.subtitle)
     return SizeCache<PairView>(
-        children: title,
-        subtitle,
+        children: titleSizing,
+        subtitleSizing,
         capacity: 128
-    ) { view, proposal in
-        let titleSize = title.size(of: view, toFit: proposal)
-        let subtitleSize = subtitle.size(of: view, toFit: proposal)
+    ) { pair, proposal in
+        let titleSize = titleSizing.size(of: pair, toFit: proposal)
+        let subtitleSize = subtitleSizing.size(of: pair, toFit: proposal)
         return CGSize(
             width: max(titleSize.width, subtitleSize.width),
             height: titleSize.height + subtitleSize.height
