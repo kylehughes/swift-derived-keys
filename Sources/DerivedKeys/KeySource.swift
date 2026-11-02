@@ -10,7 +10,8 @@
 /// Use a ``KeyValueProvider`` for live non-Sendable state. Closure convenience
 /// providers are Sendable so they cannot erase actor isolation. A source retains
 /// its provider for its lifetime. Capture actor state outside the provider
-/// and pass the resulting snapshot as input. No Sendable constraint is imposed.
+/// and pass the resulting snapshot as input. Input and returned value types need
+/// not be Sendable.
 public struct KeySource<Input> {
     /// The largest supported number of nodes on a root-to-leaf path.
     ///

@@ -255,26 +255,66 @@ struct SizeCacheTests {
     }
 
     @Test func threeLevelsMeasureIndependentlyAndInvalidateThroughNestedValues() {
-        var calls = [0, 0, 0]
-        let leaf = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 2) { root, _ in
+        @MainActor
+        final class Card {
+            let header = SizeTestItem(2)
+            let document = SizeTestPanel()
+            var spacing: CGFloat = 3
+        }
+
+        var calls = [0, 0, 0, 0]
+        var leafProposals: [CGSize] = []
+        let leaf = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 4) { root, proposal in
             calls[0] += 1
-            return CGSize(width: root.value, height: 1)
+            leafProposals.append(proposal)
+            return CGSize(width: proposal.width, height: CGFloat(root.value))
         }
-        let middle = SizeCache<SizeTestPanel>(children: leaf.at(\.first), capacity: 2) { root, proposal in
+        let textSizing = leaf.bound(to: \SizeTestPanel.first)
+        let middle = SizeCache<SizeTestPanel>(
+            dependingOn: \.padding,
+            children: textSizing,
+            capacity: 4
+        ) { root, proposal in
             calls[1] += 1
-            return leaf.size(of: root.first, toFit: proposal)
+            let padding = CGFloat(root.padding)
+            let inner = CGSize(width: max(0, proposal.width - 2 * padding), height: CGFloat.greatestFiniteMagnitude)
+            let text = textSizing.size(of: root, toFit: inner)
+            return CGSize(width: proposal.width, height: text.height + 2 * padding)
         }
-        let top = SizeCache<SizeTestPanel>(children: middle, capacity: 2) { root, proposal in
+        let header = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 4) { root, proposal in
             calls[2] += 1
-            return middle.size(of: root, toFit: proposal)
+            return CGSize(width: proposal.width, height: CGFloat(root.value))
         }
-        let root = SizeTestPanel()
-        #expect(top.size(of: root, toFit: bounds).width == 1)
-        #expect(top.size(of: root, toFit: bounds).width == 1)
-        #expect(calls == [1, 1, 1])
-        root.first.value = 2
-        #expect(top.size(of: root, toFit: bounds).width == 2)
-        #expect(calls == [2, 2, 2])
+        let headerSizing = header.bound(to: \Card.header)
+        let documentSizing = middle.bound(to: \Card.document)
+        let top = SizeCache<Card>(
+            dependingOn: \.spacing,
+            children: headerSizing,
+            documentSizing,
+            capacity: 4
+        ) { root, proposal in
+            calls[3] += 1
+            let childProposal = CGSize(width: proposal.width, height: CGFloat.greatestFiniteMagnitude)
+            let headerSize = headerSizing.size(of: root, toFit: childProposal)
+            let documentSize = documentSizing.size(of: root, toFit: childProposal)
+            return CGSize(width: proposal.width, height: headerSize.height + root.spacing + documentSize.height)
+        }
+        let root = Card()
+        #expect(top.size(of: root, toFit: bounds) == CGSize(width: 100, height: 14))
+        #expect(top.size(of: root, toFit: bounds) == CGSize(width: 100, height: 14))
+        #expect(calls == [1, 1, 1, 1])
+
+        root.spacing = 7
+        #expect(top.size(of: root, toFit: bounds).height == 18)
+        #expect(calls == [1, 1, 1, 2])
+
+        root.document.first.value = 5
+        #expect(top.size(of: root, toFit: bounds).height == 22)
+        #expect(calls == [2, 2, 1, 3])
+
+        #expect(top.size(of: root, toFit: CGSize(width: 120, height: 80)) == CGSize(width: 120, height: 22))
+        #expect(calls == [3, 3, 2, 4])
+        #expect(leafProposals == [92, 92, 112].map { CGSize(width: $0, height: CGFloat.greatestFiniteMagnitude) })
     }
 
     @Test func childClearingAndEvictionPreserveParentResults() {

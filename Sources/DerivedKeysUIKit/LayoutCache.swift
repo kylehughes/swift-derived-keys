@@ -41,6 +41,11 @@ public final class LayoutCache<Operation, Input, Context, Value> where Input: Ha
     /// Captures a complete request, automatically including the effective proposal.
     ///
     /// Creating a key does not perform or schedule a calculation or alter recency.
+    /// - Parameters:
+    ///   - input: Stable content values consumed by the layout algorithm.
+    ///   - proposal: The effective fitting bounds used by the calculation.
+    ///   - context: Stable style and environment values consumed by the algorithm.
+    /// - Returns: A key containing the operation, version, input, proposal, and context.
     public func key(
         for input: Input,
         proposal: FittingProposal,
@@ -62,6 +67,14 @@ public final class LayoutCache<Operation, Input, Context, Value> where Input: Ha
     /// Hits and successful insertions become most recently used. A successful miss at capacity
     /// evicts the least recently used entry. Optional `nil` results are real hits. A thrown
     /// error propagates without insertion or eviction. At zero capacity every call calculates.
+    /// - Parameters:
+    ///   - input: Stable content values captured in the request key.
+    ///   - proposal: The effective fitting bounds, automatically included in the key.
+    ///   - context: Stable style and environment values captured in the request key.
+    ///   - compute: The nonescaping synchronous calculation, called only on a miss with
+    ///     the keyed input, proposal, and context. It must not read uncaptured variable state
+    ///     or reenter this cache, including through another reference.
+    /// - Returns: The retained result on a hit, or the callback's result on a successful miss.
     public func value(
         for input: Input,
         proposal: FittingProposal,

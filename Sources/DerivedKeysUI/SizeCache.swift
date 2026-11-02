@@ -5,7 +5,9 @@ import DerivedKeysUIKit
 /// A synchronous main-actor LRU cache with one configured size-measurement recipe.
 ///
 /// Equal captured dependencies and effective proposals reuse results across root instances.
-/// Capture every value read by the recipe, including environment values. Measurement must
+/// Select every variable value read by the recipe, including environment values. Unselected
+/// measurement settings must be identical across all roots sharing this cache and remain fixed
+/// for its lifetime; select settings that vary or use separate caches. Measurement must
 /// read values consistent with the preceding snapshot; main-actor isolation does not freeze
 /// aliases. Child descriptions contribute values, not child measurements or proposals.
 ///
@@ -36,6 +38,17 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     ///
     /// Both dependency lists may be empty. Local values precede children in the snapshot.
     /// Child storage and measurement closures are not retained by these descriptions.
+    /// The recipe must capture the child caches or bound handles it measures.
+    ///
+    /// - Parameters:
+    ///   - paths: Stable hashable values read from each root before lookup.
+    ///   - children: Ordered dependency descriptions that contribute to every snapshot,
+    ///     whether or not the recipe measures those children.
+    ///   - capacity: The maximum number of retained sizes; zero disables storage.
+    ///   - measure: The retained synchronous recipe, called on a miss with the current root
+    ///     and normalized proposal. Measure children or use an uncached routine when the
+    ///     root's `sizeThatFits(_:)` override calls this cache; calling that override here
+    ///     would reenter the cache.
     /// - Precondition: Capacity is nonnegative and the composed depth is at most `maximumDepth`.
     public init<each Value>(
         dependingOn paths: repeat KeyPath<Root, each Value>,
@@ -75,6 +88,9 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     ///
     /// A changed root may describe a different entry from an earlier measurement.
     /// Children are captured but their result storage is not accessed or cleared.
+    /// - Parameters:
+    ///   - root: The root whose current selected values identify the entry.
+    ///   - size: The fitting proposal used for the entry, normalized as during lookup.
     public func removeSize(of root: Root, toFit size: CGSize) {
         checkAccess()
         storage.removeValue(for: key(of: root, toFit: size))
@@ -90,6 +106,12 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     /// Snapshot evaluation precedes lookup even on hits. Parent hits never look up child
     /// results. Expected lookup bookkeeping is amortized constant time, excluding snapshot
     /// evaluation, hashing, equality, and measurement.
+    /// - Parameters:
+    ///   - root: The current root to snapshot and, on a miss, measure. Its identity is not
+    ///     implicitly part of the key, and the cache does not implicitly retain it.
+    ///   - size: The fitting proposal in points, with greatest finite magnitude denoting
+    ///     an unconstrained axis.
+    /// - Returns: The retained size on a hit, or the configured recipe's result on a miss.
     /// - Precondition: Both proposal axes are finite and nonnegative; this cache is not measuring.
     public func size(of root: Root, toFit size: CGSize) -> CGSize {
         checkAccess()

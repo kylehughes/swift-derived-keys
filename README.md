@@ -17,7 +17,7 @@ Create caches once in a retained main-actor owner. The walkthrough starts with o
 
 ### Cache one measurement
 
-The UIKit convenience initializer calls `sizeThatFits(_:)` on the view passed to lookup. Select the properties that can change the measurement; keep all other measurement settings fixed.
+The UIKit convenience initializer calls `sizeThatFits(_:)` on the view passed to lookup. Select the properties that can change the measurement. Every view measured through one cache must use the same unselected measurement settings. Select settings that vary between views or requests, or use separate caches for different fixed configurations.
 
 Here `view` is an application `DocumentContentView` that exposes its text and button controls. The [complete example](Sources/DerivedKeysUIExample/DocumentContentView.swift) fixes the text view's wrapping, insets, padding, and scrolling configuration.
 
@@ -32,14 +32,17 @@ let textSizes = SizeCache<UITextView>(
     capacity: 256
 )
 
+let availableSize = CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
 let size = textSizes.size(of: view.textView, toFit: availableSize)
 ```
 
-A lookup reads the selected values and automatically includes **both fitting dimensions** in the key. On a miss it calls the passed text view's `sizeThatFits(_:)` with the normalized proposal. The root view is not part of the key, so different views can reuse a result through the same cache. Selected values must be `Hashable` and stable; the root needs neither `Hashable` nor `Sendable` conformance.
+The view passed to `size(of:toFit:)` is the cache's **root**; the fitting **proposal** is the size you would pass to `sizeThatFits(_:)`. A lookup reads the selected values and automatically includes **both fitting dimensions** in the key. On a miss, this initializer calls the text view's `sizeThatFits(_:)` with the normalized proposal. The root view itself is not part of the key, so equivalently configured views can share results. Selected values must be `Hashable` and stable; the root needs neither `Hashable` nor `Sendable` conformance.
 
-Use finite, nonnegative proposal dimensions; `CGFloat.greatestFiniteMagnitude` is supported for an unconstrained axis. See [fitting proposals](#fitting-proposals) for validation and normalization rules. A cache hit skips the recipe, so side effects that must run on every request belong outside it.
+If your model already owns the displayed text, consider [selecting that authoritative value](Examples/Size-Caches.md#select-authoritative-model-text). The recorded Simulator workload found cheaper repeated requests with its native model strings than with identical text read back from UIKit. Keep the model and rendered text synchronized; a Swift `String` property alone does not guarantee a particular storage representation.
 
-For a small view with one remembered size, an ordinary request struct and stored result may suffice. These APIs let you compose dependencies and retain results for several input states within a fixed capacity. Caching still pays for snapshot selection, hashing, and equality; it is not universally faster than direct measurement. The [UIKit sizing benchmarks](Benchmarks/README.md) compare warm views, shared results, and changing layouts.
+Use finite, nonnegative proposal dimensions; `CGFloat.greatestFiniteMagnitude` is supported for an unconstrained axis. See [fitting proposals](#fitting-proposals) for validation and normalization rules. A cache hit skips the measurement recipe—the calculation configured for that cache—so side effects that must run on every request belong outside it.
+
+For a small view with one remembered size, an ordinary request struct and stored result may suffice. These APIs let you compose dependencies and retain results for several input states within a fixed capacity. A hit still pays for dependency reads, snapshot construction, hashing, and equality. In the [recorded Simulator run](Benchmarks/UIKit-Native-Fitting-Results.md), warm composed parents and some shared measurements benefited; already-warm labels and the low-hit mixed parent trace favored direct UIKit fitting. Use the [benchmark methodology](Benchmarks/README.md) to evaluate your own workload.
 
 ### Compose a layout
 
@@ -87,7 +90,7 @@ let edited = contentSizes.size(of: view, toFit: availableSize) // Parent and tex
 
 The button's other measurement settings are fixed, including its configuration. The calculation captures the same bound handles declared in `children:`. A parent hit skips its calculation and all child result lookups. A parent miss executes the calculation, whose child lookups can independently hit.
 
-Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example intentionally computes natural height from the outer width. Every declared child participates in the parent snapshot, including a hidden button, so changes to an unused child can still cause a parent miss.
+Proposal transformation appears only in the calculation. Padding affects the inner width, so padding belongs in the parent's dependencies; each child keys the actual proposal it receives. The example expects an actual available width and returns that width while computing natural height; do not pass the unconstrained sentinel for width. Every declared child participates in the parent snapshot, including a hidden button, so changes to an unused child can still cause a parent miss.
 
 ### Choose ownership
 
@@ -127,24 +130,15 @@ Bound lookup handles retain their original cache. Child descriptions retain only
 
 ### Nest layouts and map child roots
 
-The same composition works beyond one layout level. Parents can themselves be children, and caches with no explicit properties can depend entirely on children:
-
-```swift
-let outerSizes = SizeCache<DocumentContentView>(
-    children: contentSizes,
-    capacity: 256
-) { content, proposal in
-    contentSizes.size(of: content, toFit: proposal)
-}
-```
+A composed cache can itself be a child. The [three-level card example](Examples/Size-Caches.md#nest-a-composed-layout) combines a header measurement with the document cache, adding a header-to-content gap. A card hit skips both; changing only the gap reuses their measurements. A parent with no local variable inputs can omit `dependingOn:` and derive its data dependencies entirely from its children.
 
 For children with different root types, `bound(to:)` creates a measurement handle for a nonoptional key path, as shown above and in the [mapping example](Examples/Size-Caches.md#map-a-child-root). Bindings can be chained through further parents. They reuse the original cache and add no storage, key identity, or snapshot depth.
 
-Use `at(_:)` when only a dependency description is needed; the parent calculation must call the original cache with the corresponding child root. Same-root and bound or mapped children can be mixed, and one child can be mapped to two distinct paths. Each declared occurrence is read independently, so separate root bindings cannot accidentally share a traversal snapshot. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
+Use `at(_:)` when only a dependency description is needed; the parent calculation must call the original cache with the corresponding child root. Same-root and bound or mapped children can be mixed, and one child can be mapped to two distinct paths. Each binding reads its own path, so a title and subtitle are captured separately. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
 
 ### Use a custom measurement recipe
 
-The closure initializer remains available for proposal transforms, custom calculations, and authoritative model dependencies. For example, a parent-root cache can select `\.model.text` while measuring its synchronized text view. The [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit. Both initializers support zero selected dependencies; callers still own the completeness of the selected inputs.
+Use the closure initializer for proposal transforms, custom calculations, and authoritative model dependencies. For example, a parent-root cache can select `\.model.text` while measuring its synchronized text view. The [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit. Both initializers support zero selected dependencies; callers still own the completeness of the selected inputs.
 
 ## Install and import
 
@@ -154,7 +148,7 @@ Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package depend
 .package(url: "https://github.com/kylehughes/swift-derived-keys", branch: "main")
 ```
 
-For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-derived-keys")` to your target and `import DerivedKeysUI` alongside UIKit. Existing products remain available:
+For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-derived-keys")` to your target and `import DerivedKeysUI` alongside UIKit. The package provides three library products:
 
 | Product | Use |
 | --- | --- |
@@ -164,7 +158,7 @@ For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-d
 
 ### Compatibility
 
-Requires Swift tools 6.4, Swift 6 language mode, and iOS 16.0+ or macOS 13.0+. Strict concurrency checking and warnings as errors apply to owned Swift targets. `SizeCache` reads and measures synchronously on the main actor. Its geometry support also builds on macOS; UIKit examples and tests are conditional on UIKit availability. The generic core uses only the Swift standard library and has no global-actor requirement. No macros or property wrappers are required.
+Requires Swift tools 6.4, Swift 6 language mode, and iOS 16.0+ or macOS 13.0+. Strict concurrency checking and warnings as errors apply to owned Swift targets. `SizeCache` reads and measures synchronously on the main actor. The closure initializer is also available on macOS; UIKit examples and tests are conditional on UIKit availability. The generic core uses only the Swift standard library and has no global-actor requirement. No macros or property wrappers are required.
 
 ## Use the cache correctly
 
@@ -184,11 +178,11 @@ Parents capture recursive dependency values even when child result storage is em
 
 Dependency composition is immutable and acyclic by construction. The checked limit is 64 snapshot nodes per path: an empty description has depth one, a description with a selected value has depth two, and each parent adds a level. Mapping adds no level. Excess depth fails a precondition.
 
-Reentering the same cache during its measurement, including count inspection or clearing, fails a precondition. Do not call a native-fitting cache from the measured view's own `sizeThatFits(_:)` override: a miss calls that override again. Use a custom recipe for that integration. Recursion through distinct child caches is supported, as in the [layout example](#compose-a-layout).
+Reentering the same cache during its measurement, including count inspection or clearing, fails a precondition. Do not call a native-fitting cache from the measured view's own `sizeThatFits(_:)` override: a miss calls that override again. For that integration, supply a custom recipe that measures children or uses a separate uncached calculation. Wrapping a call to the same view's cached `sizeThatFits(_:)` in a closure still reenters the cache. Recursion through distinct child caches is supported, as in the [layout example](#compose-a-layout).
 
 ### Storage, lifetime, and clearing
 
-`capacity` limits entries in each cache; zero disables storage. Successful lookups update LRU recency, and full caches evict their least recently used entry. Use `count`, `removeSize(of:toFit:)`, and `removeAll()` to inspect or clear local results. Removal selects the root's current dependencies and proposal. Bound handles expose measurement and dependency composition only; inspect or clear the original cache.
+`capacity` limits entries in each cache; zero disables storage. Choose it for the distinct content, fitting sizes, and other selected states you expect to revisit before eviction. Capacity counts entries, not bytes: large snapshots and results retain more memory. Successful lookups update LRU recency, and full caches evict their least recently used entry. Use `count`, `removeSize(of:toFit:)`, and `removeAll()` to inspect or clear local results. Removal selects the root's current dependencies and proposal. Bound handles expose measurement and dependency composition only; inspect or clear the original cache.
 
 Clearing a parent leaves its children intact. Clearing or evicting a child leaves otherwise valid parent results intact. Previous input states can reuse retained entries when they return. If an undeclared external change requires clearing, clear **every affected result cache**, or represent that change as a dependency. There is no recursive clearing or shared eviction budget.
 
@@ -196,9 +190,53 @@ Entries retain snapshots and results, not lookup roots implicitly. The configure
 
 ## Use the generic core
 
-The same dependency and memoization concepts work without UI. The [document exporter](Examples/Document-Export.md) selects content and export options while ignoring selection and scrolling; run it with `swift run DocumentExportExample`.
+The same dependency selection and bounded reuse work without UI. This exporter captures text and an export option, so changing selection preserves the cached result:
 
-Use the [generic API guide](Examples/Generic-Core.md) for typed keys, `KeyProjection`, `KeySource`, and `MemoizationCache`. `DependencySnapshot(value:)` and `DependencySnapshot(children:)` also support direct heterogeneous value composition outside UI. The original throwing construction and computation APIs, optional-value hits, and independent value copies remain available.
+```swift
+import DerivedKeys
+
+enum ExportOperation {}
+
+struct Document {
+    var text: String
+    var isSelected: Bool
+}
+
+struct ExportInput: Hashable {
+    let text: String
+    let uppercase: Bool
+}
+
+struct Exporter {
+    private var cache = MemoizationCache<
+        RequestKey<ExportOperation, ExportInput, String>, String
+    >(capacity: 32)
+
+    mutating func export(_ document: Document, uppercase: Bool) -> String {
+        let input = ExportInput(text: document.text, uppercase: uppercase)
+        let key = RequestKey(
+            operation: ExportOperation.self,
+            dependencies: input,
+            context: "plain-text"
+        )
+        return cache.value(for: key) {
+            input.uppercase ? input.text.uppercased() : input.text
+        }
+    }
+}
+
+var exporter = Exporter()
+var document = Document(text: "Hello", isSelected: false)
+let first = exporter.export(document, uppercase: false)
+document.isSelected = true
+let second = exporter.export(document, uppercase: false) // Retained cache hit.
+let capitals = exporter.export(document, uppercase: true) // Different key.
+assert(first == second && capitals == "HELLO")
+```
+
+Changing text or the export option selects another entry; returning to earlier inputs can reuse a retained result. The [document export guide](Examples/Document-Export.md) describes the runnable example with ordered paragraphs and formats. Run it with `swift run DocumentExportExample`.
+
+Use the [generic API guide](Examples/Generic-Core.md) for projections, typed operation keys, and runtime source graphs. `DependencySnapshot` also composes heterogeneous captured values directly. `MemoizationCache` supports throwing calculations without insertion on failure, treats a cached optional `nil` as a hit, and gives copied cache values independent storage behavior.
 
 ## Further documentation
 

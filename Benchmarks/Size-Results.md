@@ -2,7 +2,7 @@
 
 This sample records one run of the [benchmark suite](Synthetic.md#size-facade-workload-and-cases) on 2026-10-28 at 20:24 UTC. Each case ran once in a separate process. These are measurements of synthetic byte-mixing calculations through `SizeCache`, not UIKit fitting measurements or a performance guarantee.
 
-This is a historical sample. The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair; use the [synthetic methodology](Synthetic.md) for these diagnostic cases. For application-sizing measurements, see the [historical UIKit results](UIKit-Results.md) or start with the [UIKit benchmark guide](README.md) for current results and methodology.
+This is a historical sample. The later [concrete-erasure comparison](Erasure-Results.md) records the representation repair; use the [synthetic methodology](Synthetic.md) for these diagnostic cases. For current application-sizing measurements, start with the [native-fitting results](UIKit-Native-Fitting-Results.md); the [UIKit benchmark guide](README.md) describes the methodology and other reports.
 
 ```sh
 BENCHMARK_SCRATCH_PATH=.build/size-benchmark-build \

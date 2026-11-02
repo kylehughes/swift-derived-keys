@@ -16,17 +16,32 @@ For a fixed schema, capture the inputs of one operation in a small `Hashable` va
 import DerivedKeys
 
 enum ExportOperation {}
+
+struct Document {
+    var text: String
+    var uppercase: Bool
+    var isSelected: Bool
+}
+
 struct ExportInput: Hashable {
     let text: String
     let uppercase: Bool
 }
 
-let projection = KeyProjection(operation: ExportOperation.self) { (input: ExportInput) in
-    DerivedKey("export", children: input)
+let projection = KeyProjection(operation: ExportOperation.self) { (document: Document) in
+    ExportInput(text: document.text, uppercase: document.uppercase)
 }
-let input = ExportInput(text: "Hello", uppercase: true)
-let key = projection.key(for: input, context: "plain-text")
+var document = Document(text: "Hello", uppercase: true, isSelected: false)
+let first = projection.key(for: document, context: "plain-text")
+document.isSelected = true
+let selected = projection.key(for: document, context: "plain-text")
+assert(first == selected)
+document.uppercase = false
+let lowercase = projection.key(for: document, context: "plain-text")
+assert(first != lowercase)
 ```
+
+The projection selects text and the export preference from the larger document. Selection changes leave the key equal; changing the export preference changes it. Calculate from the captured `ExportInput` in the key, or capture one input and use it for both projection and calculation.
 
 Keep every value's equality and hashing stable for the lifetime of a key. `Hashable` does not ensure immutability: copying a mutable class reference is not a snapshot. Project its content into immutable values instead. A content ID alone cannot describe edits under that ID. A revision is sufficient only if it covers every relevant mutation, is paired with a unique content identity, and the pair is not reused for different content while entries may remain.
 
@@ -35,18 +50,63 @@ Keep every value's equality and hashing stable for the lifetime of a key. `Hasha
 `KeySource<Input>` describes an immutable graph of dependency reads. Its providers run when `snapshot(for:)` is called, producing a `DependencySnapshot` with the evaluated values and structure. Use that snapshot in a key; sources themselves are not dictionary keys.
 
 ```swift
-let text = KeySource<ExportInput>("text") { $0.text }
-let options = KeySource<ExportInput>("uppercase") { $0.uppercase }
+import DerivedKeys
+
+enum RuntimeExportOperation {}
+
+struct RuntimeExportInput {
+    let text: String
+    let uppercase: Bool
+}
+
+let text = KeySource<RuntimeExportInput>("text") { $0.text }
+let options = KeySource<RuntimeExportInput>("uppercase") { $0.uppercase }
 let source = try KeySource("export", children: [text, options])
-let input = ExportInput(text: "Hello", uppercase: true)
+let input = RuntimeExportInput(text: "Hello", uppercase: true)
 let key = RequestKey(
-    operation: ExportOperation.self,
+    operation: RuntimeExportOperation.self,
     dependencies: source.snapshot(for: input),
     context: "plain-text"
 )
+assert(key.dependencies == source.snapshot(for: input))
 ```
 
 The closure convenience requires `@Sendable`, so an actor-isolated closure cannot be silently stored as a nonisolated callback. Inputs and returned `Hashable` values need not be `Sendable`. For live non-Sendable state, conform a reader to `KeyValueProvider` and pass it as `provider:`. Its `nonisolated value(for:)` method makes the execution contract explicit without making the reader transferable. `KeyProjection` also accepts this reader form. Keep that state within its mutation owner.
+
+This reader retains a mutable, non-Sendable store and returns its current text as a stable `String` value. `captureLiveText()` owns the store and source for one synchronous operation; neither escapes to another concurrency domain. Earlier snapshots retain their captured text after the store changes.
+
+```swift
+import DerivedKeys
+
+final class DocumentStore {
+    var text: String
+
+    init(text: String) {
+        self.text = text
+    }
+}
+
+struct DocumentTextProvider: KeyValueProvider {
+    let store: DocumentStore
+
+    nonisolated func value(for input: Void) -> String {
+        store.text
+    }
+}
+
+func captureLiveText() {
+    let store = DocumentStore(text: "Hello")
+    let source = KeySource<Void>("text", provider: DocumentTextProvider(store: store))
+    let first = source.snapshot(for: ())
+    store.text = "Goodbye"
+    let edited = source.snapshot(for: ())
+    assert(first != edited)
+    store.text = "Hello"
+    assert(first == source.snapshot(for: ()))
+}
+
+captureLiveText()
+```
 
 Providers must be synchronous, side-effect-free reads: no I/O, mutation, suspension, or recursive evaluation. Actor-isolated properties belong in an explicit snapshot captured by the actor before calling the source. Sources retain their providers, so avoid owner/source capture cycles; evaluated keys and cache entries do not retain those providers. A weak-owner adapter should represent a missing owner explicitly, never fabricate a valid dependency value.
 

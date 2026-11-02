@@ -14,6 +14,51 @@ Declare a distinct operation type for each layout algorithm. Capture the content
 
 Use ``FittingProposal/init(fitting:)`` to validate a UIKit fitting size. Its greatest-finite-magnitude sentinel represents an unconstrained dimension; NaN, infinity, and negatives throw. ``FittingProposal/fittingSize`` bridges back to UIKit without quantizing finite bounds. The cache does not impose rounding, clamping, text measurement, or frame assignment.
 
+## Measure with a retained cache
+
+Retain a measurer in a view or another main-actor owner. Its cache survives individual requests. This label calculation reads only the captured text, proposal, and font size; all other label measurement settings stay fixed:
+
+```swift
+import DerivedKeysUIKit
+import UIKit
+
+enum BadgeLayout {}
+
+struct BadgeStyle: Hashable {
+    let fontSize: CGFloat
+}
+
+@MainActor
+final class BadgeMeasurer {
+    private let cache = LayoutCache<BadgeLayout, String, BadgeStyle, CGSize>(capacity: 32)
+
+    func size(of text: String, toFit fittingSize: CGSize, style: BadgeStyle) throws -> CGSize {
+        let proposal = try FittingProposal(fitting: fittingSize)
+        return cache.value(for: text, proposal: proposal, context: style) {
+            text, proposal, style in
+            let label = UILabel()
+            label.text = text
+            label.font = .systemFont(ofSize: style.fontSize)
+            label.numberOfLines = 1
+            label.textAlignment = .left
+            label.semanticContentAttribute = .forceLeftToRight
+            return label.sizeThatFits(proposal.fittingSize)
+        }
+    }
+}
+
+@MainActor
+func measureBadge(using measurer: BadgeMeasurer) throws -> CGSize {
+    try measurer.size(
+        of: "Unread",
+        toFit: CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude),
+        style: BadgeStyle(fontSize: 17)
+    )
+}
+```
+
+Pass the retained `BadgeMeasurer` to `measureBadge(using:)` for successive requests. A new measurer per request would discard reusable entries.
+
 ## Reuse results for sizing and layout
 
 Use the same effective proposal for sizing and layout when both operations perform the same calculation. A view that deliberately computes natural height can use a width-only proposal in both paths. Capture every font, trait, inset, and other input the algorithm reads; main-actor isolation does not make an incomplete dependency selection correct. Changing content and scheduling layout remain application responsibilities.

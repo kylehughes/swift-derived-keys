@@ -73,6 +73,8 @@ Values are **median [minimum–maximum] µs per request**, using each trial's lo
 | Content/font changes | 3,672.03 [3,004.54–4,707.04] | 3,751.52 [2,397.92–4,652.75] | 1.022× | 4/9 |
 | Mixed, capacity 16 | 2,454.04 [2,255.93–4,061.03] | 2,559.89 [2,250.10–3,239.51] | 1.043× | 3/9 |
 
+The standalone text-view ranges are wide. Its warm end-to-end medians (4,614.72 µs direct and 1,345.69 µs cached) also differ substantially from the separate stable-input phases below (847.572 µs fitting and 149.515 µs full lookup). These observations do not isolate the cause of the discrepancy or establish a universal caching advantage for text views. Use the paired results, ranges, and application workload together.
+
 ### DocumentContentView-text
 
 | Scenario | Direct, µs/request | Cached, µs/request | Cached / direct | Cached faster trials |
@@ -160,7 +162,7 @@ The same suite separately measures warmed fitting, dependency capture, hashing p
 
 For warmed labels, dependency capture alone takes about 2.1 µs, compared with roughly 0.08 µs for a direct fit in these diagnostics. Caching cannot recover that difference for an unchanged label. Sharing semantic results across initially unfitted multiline and attributed views can help: those pool rows favored caching in eight of nine pairs, although several trials were noisy.
 
-The standalone long-text snapshot takes 61.71 µs to hash, while a complete warm lookup takes 149.51 µs in the separate diagnostic. The text getter itself takes about 0.33 µs. This is consistent with the earlier [UIKit/model String representation comparison](String-Results.md); this run does not repeat that comparison or measure its model-backed alternative. When a model already owns authoritative text, the [custom model-backed recipe](../Examples/Size-Caches.md#select-authoritative-model-text) remains an option. Keep model and rendered state synchronized. The convenience initializer does not make arbitrary dependency reads cheap or complete.
+The standalone long-text snapshot takes 61.71 µs to hash, while a complete warm lookup takes 149.51 µs in the separate diagnostic. The text getter itself takes about 0.33 µs. This is consistent with the earlier [UIKit/model String representation comparison](String-Results.md); this run does not repeat that comparison or measure its model-backed alternative. When a model already owns authoritative text, the [custom model-backed recipe](../Examples/Size-Caches.md#select-authoritative-model-text) remains an option. Keep model and rendered state synchronized, and measure the selected values: a model property does not guarantee native or contiguous string storage. The convenience initializer does not make arbitrary dependency reads cheap or complete.
 
 The document's native button lookup costs more than its warm direct fit in this run, even though it avoids every repeated measurement. A warm parent still benefits because it avoids text fitting and the whole combination. For parent-only misses, it pays for parent capture and child lookups again; those requests still beat direct fitting here. The low-hit mixed parent trace did not benefit. Choose the cache boundary using the full request cost and application hit rate, not the measurement count alone.
 

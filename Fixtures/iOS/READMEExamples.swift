@@ -4,7 +4,7 @@ import DerivedKeysUIExample
 import UIKit
 
 @MainActor
-func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
+func readmeMeasurements(view: DocumentContentView) {
     let textSizes = SizeCache<UITextView>(
         dependingOn: \.text,
         \.font,
@@ -12,6 +12,7 @@ func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
         capacity: 256
     )
 
+    let availableSize = CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
     let size = textSizes.size(of: view.textView, toFit: availableSize)
 
     let buttonSizes = SizeCache<UIButton>(
@@ -52,14 +53,7 @@ func readmeMeasurements(view: DocumentContentView, availableSize: CGSize) {
     view.content += " Another paragraph."
     let edited = contentSizes.size(of: view, toFit: availableSize)  // Parent and text miss; button hits.
 
-    let outerSizes = SizeCache<DocumentContentView>(
-        children: contentSizes,
-        capacity: 256
-    ) { content, proposal in
-        contentSizes.size(of: content, toFit: proposal)
-    }
-
-    _ = (size, initial, spaced, edited, outerSizes)
+    _ = (size, initial, spaced, edited)
 }
 
 @MainActor
@@ -112,4 +106,60 @@ func makePairSizes(titleSizes: SizeCache<UILabel>) -> SizeCache<PairView> {
             height: titleSize.height + subtitleSize.height
         )
     }
+}
+
+// Minimal root for the guide's sizing composition; frame assignment is application-owned.
+@MainActor
+final class DocumentCardView: UIView {
+    let headerLabel = UILabel()
+    let contentView: DocumentContentView
+    var spacing: CGFloat = 12
+
+    init(contentView: DocumentContentView) {
+        self.contentView = contentView
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("Use init(contentView:).") }
+}
+
+@MainActor
+func makeCardSizes(
+    headerSizes: SizeCache<UILabel>,
+    contentSizes: SizeCache<DocumentContentView>
+) -> SizeCache<DocumentCardView> {
+    let headerSizing = headerSizes.bound(to: \DocumentCardView.headerLabel)
+    let contentSizing = contentSizes.bound(to: \DocumentCardView.contentView)
+    return SizeCache<DocumentCardView>(
+        dependingOn: \.spacing,
+        children: headerSizing,
+        contentSizing,
+        capacity: 128
+    ) { card, proposal in
+        let childProposal = CGSize(
+            width: proposal.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        let headerSize = headerSizing.size(of: card, toFit: childProposal)
+        let contentSize = contentSizing.size(of: card, toFit: childProposal)
+        return CGSize(
+            width: proposal.width,
+            height: headerSize.height + card.spacing + contentSize.height
+        )
+    }
+}
+
+@MainActor
+func readmeCardMeasurement() {
+    let documentCaches = DocumentSizeCaches()
+    let card = DocumentCardView(contentView: DocumentContentView(content: "Document", caches: documentCaches))
+    card.headerLabel.text = "Header"
+    let headerSizes = makeTitleSizes()
+    let cardSizes = makeCardSizes(headerSizes: headerSizes, contentSizes: documentCaches.contentSizes)
+    let cardSize = cardSizes.size(
+        of: card,
+        toFit: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+    )
+    _ = cardSize
 }

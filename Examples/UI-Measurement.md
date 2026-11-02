@@ -8,31 +8,48 @@ The [compiled `LabelView` example](../Sources/DerivedKeysUIExample/LabelView.swi
 
 `LayoutCache<Operation, Input, Context, Value>` is a main-actor reference type. Declare a distinct operation enum for each layout algorithm, capture its content in a `Hashable` input, and capture any environment values the algorithm reads in a `Hashable` context. The result can be `CGSize` or an immutable structure containing all the frames and sizes your view needs.
 
-Retain the cache in your view or another main-actor owner to reuse results across requests. The function below illustrates a single request.
+Retain the cache in your view or another main-actor owner to reuse results across requests. This measurer owns one cache, uses the callback's captured text, proposal, and style, and keeps the remaining label configuration fixed:
 
 ```swift
 import DerivedKeysUIKit
 import UIKit
 
 enum BadgeLayout {}
-struct Environment: Hashable { let fontSize: CGFloat }
+
+struct BadgeStyle: Hashable {
+    let fontSize: CGFloat
+}
 
 @MainActor
-func measureBadge() throws -> CGSize {
-    let cache = LayoutCache<BadgeLayout, String, Environment, CGSize>(capacity: 32)
-    let proposal = try FittingProposal(fitting: CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
-    return cache.value(for: "Unread", proposal: proposal, context: Environment(fontSize: 17)) {
-        text, proposal, environment in
-        let label = UILabel()
-        label.text = text
-        label.font = .systemFont(ofSize: environment.fontSize)
-        label.numberOfLines = 1
-        label.textAlignment = .left
-        label.semanticContentAttribute = .forceLeftToRight
-        return label.sizeThatFits(proposal.fittingSize)
+final class BadgeMeasurer {
+    private let cache = LayoutCache<BadgeLayout, String, BadgeStyle, CGSize>(capacity: 32)
+
+    func size(of text: String, toFit fittingSize: CGSize, style: BadgeStyle) throws -> CGSize {
+        let proposal = try FittingProposal(fitting: fittingSize)
+        return cache.value(for: text, proposal: proposal, context: style) {
+            text, proposal, style in
+            let label = UILabel()
+            label.text = text
+            label.font = .systemFont(ofSize: style.fontSize)
+            label.numberOfLines = 1
+            label.textAlignment = .left
+            label.semanticContentAttribute = .forceLeftToRight
+            return label.sizeThatFits(proposal.fittingSize)
+        }
     }
 }
+
+@MainActor
+func measureBadge(using measurer: BadgeMeasurer) throws -> CGSize {
+    try measurer.size(
+        of: "Unread",
+        toFit: CGSize(width: 240, height: CGFloat.greatestFiniteMagnitude),
+        style: BadgeStyle(fontSize: 17)
+    )
+}
 ```
+
+Retain one `BadgeMeasurer` and pass it to `measureBadge(using:)` for successive requests. Creating a measurer for each request discards the entries that could be reused.
 
 The cache automatically includes the effective fitting proposal in its key, then supplies the captured input, proposal, and context to the calculation. Measure from those arguments. Reading other mutable view or model properties inside the callback can produce an incomplete key even on the main actor.
 

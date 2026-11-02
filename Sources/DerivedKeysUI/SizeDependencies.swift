@@ -23,6 +23,9 @@ public class SizeDependencies<Root> {
     ///
     /// The returned description retains the immutable capture recipe, not this cache's
     /// result storage or measurement closure. Mapping does not increase dependency depth.
+    /// - Parameter path: The nonoptional nested root to read from each parent. This maps
+    ///   dependency capture only; use `bound(to:)` on a cache or binding to measure through it.
+    /// - Returns: A description that reads the nested root without retaining result storage.
     public func at<Parent>(_ path: KeyPath<Parent, Root>) -> SizeDependencies<Parent> {
         let capture = capture
         return SizeDependencies<Parent>(depth: depth) { root in
@@ -35,6 +38,8 @@ public class SizeDependencies<Root> {
     /// Snapshots exclude the fitting proposal and measurement recipe identity, so a snapshot
     /// alone is not a complete size-result key. Cost is linear in the described graph and
     /// projected value work; repeated child occurrences are evaluated separately.
+    /// - Parameter root: The current root whose selected values are captured.
+    /// - Returns: The selected values and structure, excluding proposal and recipe identity.
     public func snapshot(of root: Root) -> DependencySnapshot {
         capture(root)
     }
