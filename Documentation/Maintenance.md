@@ -28,7 +28,7 @@ The compiler script builds public-import controls under Swift 6 complete concurr
 
 The Simulator script discovers an installed runtime, observes every selected test, and removes only the device it creates.
 
-Precondition fixtures execute in isolated debug child processes. Each invalid case must terminate abnormally with its intended diagnostic; valid controls must complete. They are outside the package test targets. Keep both valid and rejected compiler controls and these trap fixtures synchronized with the public contract.
+Precondition fixtures run in isolated debug child processes outside the package test targets: invalid cases must trap with the expected message, and valid controls must exit cleanly. Keep the compiler fixtures (both passing and expected-error cases) and precondition fixtures aligned with the public API contract.
 
 ## Measure UIKit performance
 

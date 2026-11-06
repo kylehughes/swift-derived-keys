@@ -122,7 +122,7 @@ Arrays preserve order. For unordered inputs, use a `Set`, a dictionary with its 
 
 The cache is a value type with exclusive mutation. Copies evolve independently, with standard-library copy-on-write costs on later mutation. Reentering the same cache during its calculation is unsupported; separate caches can be composed. Results, like keys, must not change meaning through mutable external aliases. Computations whose side effects must run on every call do not belong in this cache.
 
-Typed keys and caches are `Sendable` only when their stored values are. Dynamic sources, projections, and erased snapshots are not `Sendable`. Their input and captured value types need no transfer conformance; non-Sendable live readers use `KeyValueProvider`, while the closure conveniences require `@Sendable`. The generic library has no main-actor requirement.
+Typed keys (`RequestKey`, `OriginalKey`, `DerivedKey`, and `KeyPair`) and `MemoizationCache` conform to `Sendable` when their stored types do. `KeySource`, `KeyProjection`, and `DependencySnapshot` are not `Sendable`, though the inputs and `Hashable` values they read need not be. The generic library has no main-actor requirement.
 
 ### UIKit cache ownership
 

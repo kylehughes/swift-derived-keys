@@ -4,19 +4,21 @@ import DerivedKeysUIKit
 
 /// A synchronous main-actor LRU cache with one configured size-measurement recipe.
 ///
-/// Equal captured dependencies and effective proposals reuse results across root instances.
-/// Select every variable value read by the recipe, including environment values. Unselected
-/// measurement settings must be identical across all roots sharing this cache and remain fixed
-/// for its lifetime; select settings that vary or use separate caches. Measurement must
-/// read values consistent with the preceding snapshot; main-actor isolation does not freeze
-/// aliases. Child descriptions contribute values, not child measurements or proposals.
+/// Roots with equal dependency snapshots and effective fitting proposals reuse cached sizes.
+/// Select every variable value read by the recipe, including environment values. Any measurement
+/// settings you omit must stay fixed for the cache's lifetime and match across all roots sharing
+/// this cache; select settings that vary or use separate caches. Child descriptions contribute
+/// their captured values to the parent's snapshot, not their measured sizes or proposals.
+///
+/// Measurement must read values consistent with the preceding snapshot. Main-actor isolation
+/// does not prevent mutations through aliases.
 ///
 /// Entries retain snapshots and sizes without implicitly retaining roots. The cache retains
-/// the configured closure for its lifetime; that closure may explicitly retain caller-owned objects.
+/// its measurement closure for its lifetime, including any objects the closure captures strongly.
 ///
-/// Sharing this reference shares result storage and recency. Results are stored without validation,
-/// rounding, or clamping. Same-cache measurement reentry, including storage inspection or
-/// removal through an alias, is unsupported and fails a precondition.
+/// Sharing a reference shares result storage and LRU recency order. Sizes are stored without
+/// validation, rounding, or clamping. Reentering the same cache during measurement, including
+/// inspecting or removing entries through an alias, fails a precondition.
 @MainActor
 public final class SizeCache<Root>: SizeDependencies<Root> {
     /// The maximum number of retained results.

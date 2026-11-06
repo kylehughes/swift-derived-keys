@@ -4,9 +4,9 @@ Cache measurements by selected key paths, then compose child caches to reuse an 
 
 ## Overview
 
-Create a ``SizeCache`` once in a retained main-actor owner. For leaf views without child caches, its UIKit convenience initializer selects heterogeneous hashable values by key path and calls the passed view's `sizeThatFits(_:)` on a miss. Parents supply a closure and declare their children. Use a closure for other custom recipes or non-UIKit roots too. Both initializers support zero selected properties.
+Create a ``SizeCache`` once on the main actor and retain it across requests. For leaf `UIView`s without child caches, the UIKit convenience initializer takes key paths to the `Hashable` properties that affect sizing and calls the supplied view's `sizeThatFits(_:)` on a miss. For parents with child caches, custom measurement recipes, or non-UIKit roots, use the closure initializer. Both initializers allow zero selected key paths; only the closure initializer accepts children.
 
-Select every variable property the calculation reads. Every unselected measurement setting must be identical across all roots sharing the cache and remain fixed for its lifetime. Select settings that vary, or use separate caches. Here the caller keeps each label's remaining settings at the same defaults:
+Include every variable property the calculation reads. Any size-affecting settings you omit must stay fixed for the cache's lifetime and match across all roots sharing it. If a setting varies, select it or use a separate cache. Here the caller leaves each label's other settings at the same defaults:
 
 ```swift
 import DerivedKeysUI
@@ -91,11 +91,11 @@ Use ``SizeDependencies/at(_:)`` for dependency-only mapping. That descriptor ret
 
 A view, screen-owned bundle, or intentionally shared static property can own caches. Composition imposes no ownership model. Each reference owns one bounded result cache; sharing the reference shares storage and recency. Clearing a parent clears only that cache, and child clearing or eviction does not invalidate a semantically valid parent result. Clear every affected cache if an undeclared external change invalidates results, or represent that change in selected values.
 
-Snapshots retain full equality-checkable values, concrete types, and child structure. They do not deep-copy mutable references. Project immutable values, including through computed properties, and keep all result-relevant state consistent between selection and computation. The configured closure is retained; user captures and selected reference values can retain objects, but roots passed to lookup are not implicitly retained. The API observes no changes and schedules no UIKit layout.
+Snapshots retain complete `Hashable` values, their concrete types, and ordered child structure without deep-copying references. Project immutable values, for example through computed properties, and keep all result-relevant state consistent between dependency capture and measurement. The cache retains its measurement closure, and closure captures or reference-valued dependencies can retain objects. Entries do not implicitly retain the root passed to lookup. `SizeCache` does not observe changes or schedule UIKit layout.
 
 Each cache uses the generic core's bounded LRU. Zero capacity disables storage. Same-cache measurement reentry, including count inspection or clearing during the recipe, fails a descriptive precondition before accessing storage. Recursive calls to distinct caches are supported.
 
-Do not call a native-fitting cache from the measured view's own `sizeThatFits(_:)` override: a miss invokes the override again. Supply a custom recipe that measures children or calls a separate uncached measurement routine. A custom recipe must also avoid calling the measured view's `sizeThatFits(_:)` when that override uses this cache; changing initializers alone does not prevent recursion. Neither initializer discovers undeclared inputs or makes mutable `Hashable` aliases stable.
+Because the UIKit convenience initializer calls the supplied view's `sizeThatFits(_:)` on a miss, do not call that cache from inside the same view's `sizeThatFits(_:)` override. Use the closure initializer and compute the size from child caches or a separate uncached helper. Calling the cached override inside a custom recipe still reenters the cache. Neither initializer discovers undeclared inputs or makes mutable `Hashable` aliases stable.
 
 ## Topics
 

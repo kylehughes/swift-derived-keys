@@ -40,7 +40,7 @@ Warm parent calculations are 0 / 0 / 0 after one warmup calculation per cache. T
 
 These are macOS **SwiftPM Release** results: Apple M1 Max, MacBookPro18,2, 10 logical CPUs, 64 GiB; macOS 27.2 (26B123), arm64; Apple Swift 6.4 (`swiftlang-6.4.0.34.1`, `clang-2100.3.34.1`), driver 1.168.6. Swift 6 mode, tools 6.4, and the macOS 13 package minimum were preserved.
 
-The baseline is the task-entry source at `7adad7c311ab773fa234f4788badb345ea9ee91e`, including the existing README reorganization. Only `DependencySnapshot.swift` and `KeySource.swift` differ among measured build inputs. The [raw observations and source/binary SHA-256 fingerprints](Measurements/Erasure-2026-10-28.json) distinguish both builds.
+The baseline source is based on commit `7adad7c311ab773fa234f4788badb345ea9ee91e` and includes the existing README reorganization. Only `DependencySnapshot.swift` and `KeySource.swift` differ among measured build inputs. The [raw observations and source/binary SHA-256 fingerprints](Measurements/Erasure-2026-10-28.json) distinguish both builds.
 
 Build the baseline and optimized source separately with `swift build -c release --product DerivedKeysBenchmarks`, then run each executable with the same arguments, alternating their order over five trials:
 

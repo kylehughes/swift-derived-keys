@@ -73,7 +73,7 @@ These flags describe these constructed values on this runtime. A Swift model pro
 
 ## Correctness and bounded reuse
 
-Timed results in all four arms match exactly for every request, with finite positive sizes and matching checksums. An untimed replay counts actual measurement-closure executions and compares cache behavior with an independent integer-identity LRU replay. Observations below apply to every content case and cached strategy; warmup is excluded.
+Timed results in all four arms match exactly for every request, with finite positive sizes and matching checksums. A separate untimed replay counts actual measurement-closure calls and verifies hits, misses, and evictions against an independent reference LRU model keyed by variant index. Observations below apply to every content case and cached strategy; warmup is excluded.
 
 | Trace | Requests | Hits / misses | Cached fits | Direct fits | Final entries | Eviction observed |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |

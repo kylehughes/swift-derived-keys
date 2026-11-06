@@ -15,10 +15,11 @@ extension SizeCache where Root: UIView {
     /// - Parameters:
     ///   - paths: Stable hashable fitting inputs read from the view before lookup.
     ///   - capacity: The maximum number of retained sizes; zero disables storage.
-    /// - Important: The view's `sizeThatFits(_:)` must not call back into this cache for that
-    ///   measurement, including through a binding; same-cache reentry fails a precondition.
-    ///   For that integration, a custom recipe must measure children or call a separate
-    ///   uncached routine, rather than calling the cached override again.
+    /// - Important: Do not call this cache from inside the measured view's own `sizeThatFits(_:)`
+    ///   override, directly or through a binding. A miss calls the override again, reenters the
+    ///   cache, and fails a precondition. For that integration, use a custom recipe that measures
+    ///   children or calls a separate uncached routine. Calling the cached override from a
+    ///   custom recipe still reenters the cache.
     /// - Precondition: Capacity is nonnegative and dependency depth is at most `maximumDepth`.
     public convenience init<each Value>(
         dependingOn paths: repeat KeyPath<Root, each Value>,

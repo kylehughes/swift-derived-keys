@@ -43,9 +43,11 @@ func makePairSizes(titleSizes: SizeCache<UILabel>) -> SizeCache<PairView> {
 
 A title and subtitle with different selected values produce separate child requests through the same cache. Each binding reads its own path, so the title and subtitle are captured separately. Equal child inputs and proposals may intentionally reuse a result. Same-root children can appear alongside mapped children in one initializer.
 
-A bound handle is a main-actor `SizeCacheBinding<Parent>` and can be chained with another `bound(to:)` to reach a further parent. It retains the original cache for measurement, with no additional storage, key identity, or snapshot depth. Inspect and clear that original cache; bindings have no count, capacity, or clearing API. Use a fully qualified key path such as `\PairView.title` when creating a standalone binding so Swift can infer the parent type.
+`bound(to:)` returns a main-actor `SizeCacheBinding<Parent>`, which you can chain with further `bound(to:)` calls for deeper hierarchies. A binding retains the original cache and shares its entries, capacity, and LRU order without adding storage, key identity, or snapshot depth. Inspect `count` or clear entries on the original `SizeCache`; bindings have no storage-management API. When assigning a binding to a local variable, write out the root type in the key path, such as `\PairView.title`, so Swift can infer `Parent`.
 
-Bindings and mappings do not unwrap optional roots. Arbitrary mapping closures and conditional child declarations are not supported. Map a nonoptional key path or keep the condition and any required stable projection in the parent recipe. Declared children are always captured, even if the calculation takes a branch that does not measure them. The facade does not discover caches called by a closure: list the children that determine the parent result and capture those same handles in its calculation.
+Bindings and mappings require nonoptional root paths; arbitrary mapping closures and conditional child declarations are not supported. Handle conditions and any required stable projections in the parent's closure and dependencies.
+
+`SizeCache` cannot discover caches called inside a closure. List the children that determine the parent result in `children:` and capture those same handles in the closure. Every declared child contributes to the snapshot on each lookup, even when a branch skips measuring it.
 
 ## Nest a composed layout
 
@@ -105,9 +107,9 @@ The document screen owns a `DocumentSizeCaches` bundle and injects it into reusa
 
 Each cache has its own capacity and LRU order. Choose a capacity for the distinct content, widths, and other selected states likely to be revisited; capacity bounds entries, not the bytes retained by their snapshots and results. A view-owned cache and an intentionally static cache are equally valid; the package installs no global storage.
 
-Descriptions retain dependency readers only, without retaining the cache, bound lookup handle, or measurement closure. The parent closure must retain any child handle it will call.
+Passing a child in `children:` captures only its dependency readers, without retaining the cache, binding, entries, or measurement closure. The parent closure must capture any child handles it calls; a `SizeCacheBinding` keeps the original cache alive for those measurements.
 
-For dependency-only mapping, use `titleSizes.at(\PairView.title)` and call `titleSizes.size(of: pair.title, toFit: proposal)` in the calculation. Unlike a bound lookup handle, that descriptor does not retain the original cache, its measurement closure, or entries.
+Use `titleSizes.at(\PairView.title)` when you only need a dependency description and plan to call `titleSizes.size(of: pair.title, toFit: proposal)` directly in the closure. The descriptor retains only dependency readers; the closure retains the cache it measures through.
 
 Cached entries contain captured values and `CGSize` results; the root supplied to `size(of:toFit:)` is not implicitly retained. Explicit user captures or reference-valued dependencies can still retain a root or owner.
 

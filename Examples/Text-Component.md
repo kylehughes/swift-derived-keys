@@ -77,15 +77,17 @@ overflow in rounding by leaving that dimension unrounded.
 
 ## Validation and reuse
 
-`FittingDimension(points:)` accepts finite nonnegative dimensions and rejects
-NaN, infinity, and negatives with `FittingProposalError.invalidDimension`.
-Use `.unconstrained` explicitly; the UIKit adapter translates it to
-`CGFloat.greatestFiniteMagnitude` only when calling `sizeThatFits`. It never
-silently interprets raw infinity as a valid bound. No proposal quantization is
-performed. Insets and spacing are finite and nonnegative; inset totals must
-remain finite. Display scale must be finite and positive, named fonts must resolve
-at a finite positive size, and line count must be nonnegative. Validation uses
-immutable private storage with no decoding or raw-value construction path.
+`FittingDimension(points:)` requires finite nonnegative values and throws
+`FittingProposalError.invalidDimension` for NaN, infinity, or negative numbers.
+Use `.unconstrained` for an unbounded axis; the UIKit adapter converts it to
+`CGFloat.greatestFiniteMagnitude` only when calling `sizeThatFits(_:)`. It never
+rounds proposal bounds or interprets raw infinity as a valid bound.
+
+Insets and spacing must be finite and nonnegative, with finite horizontal and
+vertical inset sums. Display scale must be finite and positive, named fonts must
+resolve at a finite positive size, and line count must be nonnegative. These
+validated values use private immutable storage with no decoding or raw-value
+construction path.
 
 Project actual content into the key, even when an entity ID stays unchanged.
 Paint-only colors, analytics identifiers, unrelated URLs, actions, and view

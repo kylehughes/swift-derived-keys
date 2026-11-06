@@ -97,11 +97,12 @@ public struct KeySource<Input> {
         return try Self(node.label, children: children.map { Self(node: $0) } + [child])
     }
 
-    /// Captures every distinct source once from one coherent input state.
+    /// Evaluates the source graph against `input`, reading each shared node at most once.
     ///
-    /// Memoization is request-local. Previously evaluated keys cannot trigger
-    /// providers again. Capturing related mutable properties individually is not
-    /// an atomic snapshot; callers are responsible for consistency across the complete request.
+    /// Shared-node memoization applies only within a single `snapshot(for:)` call.
+    /// Later calls reevaluate providers; already-created snapshots never run providers again.
+    /// Reading separate mutable properties one by one is not atomic, so callers must
+    /// keep all input state consistent across the complete request.
     /// - Complexity: O(v + e) visits for v nodes and e edges, plus provider work.
     ///   Result equality and hashing inspect values and repeated child occurrences.
     public func snapshot(for input: Input) -> DependencySnapshot {
