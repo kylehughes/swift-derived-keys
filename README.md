@@ -140,10 +140,10 @@ Use the closure initializer for proposal transforms, custom calculations, and au
 
 ## Install and import
 
-Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies. Private checkouts require repository access. Use the development reference `main`:
+Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies, starting at version `1.0.0`, or add it to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/kylehughes/swift-derived-keys", branch: "main")
+.package(url: "https://github.com/kylehughes/swift-derived-keys", from: "1.0.0")
 ```
 
 For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-derived-keys")` to your target and `import DerivedKeysUI` alongside UIKit. The package provides three library products:

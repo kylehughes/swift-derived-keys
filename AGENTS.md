@@ -35,6 +35,8 @@ Use four-space indentation and the checked-in formatter settings. Format product
 
 Keep README, guide, and DocC snippets synchronized with their compiler companions: [README generic example](Fixtures/Concurrency/READMEGenericExample.swift), [generic documentation examples](Fixtures/Concurrency/DocumentationExamples.swift), [README UIKit examples](Fixtures/iOS/READMEExamples.swift), and [UIKit documentation examples](Fixtures/iOS/DocumentationExamples.swift). The compiler script discovers these fixtures automatically; it does not extract or compile Markdown code fences. Build static DocC into a fresh output directory using the maintenance commands.
 
+Write user-facing documentation for a public stable release. Installation examples use a version requirement starting at `1.0.0`; update that version when a newer stable release ships. Keep private-repository access and development-branch instructions in maintainer documentation.
+
 Preserve peer edits. Repository instructions do not authorize deployment, releases, visibility changes, or history rewrites.
 
 ## UIKit benchmarks
