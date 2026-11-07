@@ -4,7 +4,13 @@ Use the [specification](../SPEC.md) for implementation requirements and the [REA
 
 ## Run local checks
 
-Use Xcode 27.1 with Swift 6.4 selected and Python 3 installed. Choose a fresh DocC output directory. From the repository root:
+Prerequisites:
+
+- **Xcode:** 27.1 selected
+- **Swift:** 6.4
+- **Python:** 3
+
+Choose a fresh DocC output directory. From the repository root:
 
 ```sh
 swift build

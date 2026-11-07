@@ -138,6 +138,8 @@ Use `at(_:)` when only a dependency description is needed; the parent calculatio
 
 Use the closure initializer for proposal transforms, custom calculations, and authoritative model dependencies. For example, a parent-root cache can select `\.model.text` while measuring its synchronized text view. The [model-backed example](Examples/Size-Caches.md#select-authoritative-model-text) explains synchronization and the measured cost of reading text back from UIKit. Both initializers support zero selected dependencies; callers still own the completeness of the selected inputs.
 
+The closure initializer is also available on macOS; native `UIView` fitting requires UIKit.
+
 ## Install and import
 
 Add `https://github.com/kylehughes/swift-derived-keys` in Xcode's package dependencies, starting at version `1.0.0`, or add it to your `Package.swift`:
@@ -156,7 +158,10 @@ For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-d
 
 ### Compatibility
 
-Requires Swift tools 6.4, Swift 6 language mode, and iOS 16.0+ or macOS 13.0+. Strict concurrency checking and warnings as errors apply to owned Swift targets. `SizeCache` reads and measures synchronously on the main actor. The closure initializer is also available on macOS; UIKit examples and tests are conditional on UIKit availability. The generic core uses only the Swift standard library and has no global-actor requirement. No macros or property wrappers are required.
+- **Swift:** 6.4+ (Swift 6 language mode)
+- **iOS:** 16.0+
+- **macOS:** 13.0+
+- **Xcode:** 27.1 (tested)
 
 ## Use the cache correctly
 
@@ -194,7 +199,7 @@ In the [recorded Simulator run](Benchmarks/UIKit-Native-Fitting-Results.md), war
 
 ## Use the generic core
 
-The same dependency selection and bounded reuse work without UI. This exporter captures text and an export option, so changing selection preserves the cached result:
+The `DerivedKeys` core uses only the Swift standard library and has no global-actor requirement. This exporter captures text and an export option, so changing selection preserves the cached result:
 
 ```swift
 import DerivedKeys
