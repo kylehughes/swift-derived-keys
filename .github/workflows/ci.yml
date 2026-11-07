@@ -45,6 +45,9 @@ jobs:
     - name: Release workflow controls
       run: python3 Scripts/test-release.py
       timeout-minutes: 5
+    - name: Documentation deployment controls
+      run: python3 Scripts/test-documentation.py
+      timeout-minutes: 5
     - name: Simulator observation controls
       run: python3 Scripts/test-check-simulator.py
       timeout-minutes: 5

@@ -21,6 +21,7 @@ python3 Scripts/check-tests.py --configuration release
 python3 Scripts/check-concurrency.py --warnings-policy
 python3 Scripts/check-preconditions.py
 python3 Scripts/test-release.py
+python3 Scripts/test-documentation.py
 python3 Scripts/test-check-simulator.py
 python3 Scripts/check-simulator.py
 swift format lint --strict --recursive Package.swift Sources Tests
@@ -50,17 +51,17 @@ The static site's entry is `/swift-derived-keys/documentation/`; its module page
 
 ## Hosted workflows
 
-The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run checks and build static documentation. Documentation deployment is disabled while the repository is private, including manual runs with `deploy` selected.
+The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run checks and publish static documentation.
 
 ### Publish documentation
 
-The Documentation workflow responds to GitHub's [`public` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#public) when this repository changes from private to public. After that change, it builds and deploys DocC automatically; subsequent pushes to `main` update the site. GitHub Pages must use **GitHub Actions** as its publishing source, and the `github-pages` environment must allow deployments from `main`.
+The Documentation workflow builds and deploys DocC on pushes to `main` and when the repository becomes public. The documentation site is public even when the source repository is private. GitHub Pages must use **GitHub Actions** as its publishing source, and the `github-pages` environment must allow deployments from `main`.
 
-The deployment job consumes only its own run's `documentation-site` artifact. Before publishing, it checks the repository's current visibility, the configured Pages URL, and that the built commit is still the head of `main`. It does not change repository visibility. If an older run is superseded, use the current commit's run instead of publishing the old artifact.
+The deployment job consumes only its own run's `documentation-site` artifact. Before publishing, it checks the canonical repository, the public Pages destination, and that the built commit is still the head of `main`. It does not change repository visibility. If an older run is superseded, use the current commit's run instead of publishing the old artifact.
 
-The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After the first public deployment, verify that entry, all three module pages, and their navigation and assets. A successful private build verifies the documentation artifact; live deployment needs a separate check.
+The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After deployment, verify that entry, all three module pages, and their navigation and assets. A successful build verifies the documentation artifact; live deployment needs a separate check.
 
-To rebuild and deploy the current public `main` manually:
+To rebuild and deploy the current `main` manually:
 
 ```sh
 gh workflow run documentation.yml --repo kylehughes/swift-derived-keys --ref main -f deploy=true

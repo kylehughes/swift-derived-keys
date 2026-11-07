@@ -7,7 +7,7 @@ name: Documentation
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy documentation when the repository is public
+        description: Deploy documentation to the public Pages site
         type: boolean
         default: false
 permissions:
@@ -31,6 +31,9 @@ jobs:
         grep -E 'Swift version 6\.4([ .]|$)' "$RUNNER_TEMP/swift-version.txt"
       timeout-minutes: 15
       shell: bash
+    - name: Documentation deployment controls
+      run: python3 Scripts/test-documentation.py
+      timeout-minutes: 5
     - name: Static DocC
       run: python3 Scripts/docs.py --output .build/site
       timeout-minutes: 15
@@ -43,8 +46,6 @@ jobs:
     if: >-
       ${{ github.repository == 'kylehughes/swift-derived-keys'
           && github.ref == 'refs/heads/main'
-          && github.event.repository.private == false
-          && github.event.repository.visibility == 'public'
           && (github.event_name == 'public' || github.event_name == 'push'
               || (github.event_name == 'workflow_dispatch' && inputs.deploy)) }}
     needs:
@@ -79,11 +80,10 @@ jobs:
         site = json.loads((temporary / "pages-site.json").read_text())
         head = json.loads((temporary / "pages-head.json").read_text())
         if (repository.get("full_name") != "kylehughes/swift-derived-keys"
-                or repository.get("private") is not False
-                or repository.get("visibility") != "public"
                 or repository.get("default_branch") != "main"):
-            raise SystemExit("Documentation deployment requires the public canonical repository")
-        if (site.get("build_type") != "workflow"
+            raise SystemExit("Documentation deployment requires the canonical repository and main branch")
+        if (site.get("public") is not True
+                or site.get("build_type") != "workflow"
                 or site.get("html_url") != "https://kylehughes.github.io/swift-derived-keys/"):
             raise SystemExit("Pages destination does not match the configured project site")
         if (head.get("ref") != "refs/heads/main"
