@@ -2,8 +2,8 @@
 ///
 /// Only the selected key-path values determine reuse. The computation must produce
 /// interchangeable results whenever those values are equal; any other inputs it reads
-/// must stay fixed for the cache's lifetime. Use `\.self` to select a complete scalar
-/// value, or named tuple members to combine inputs. No dependencies means one shared key.
+/// must stay fixed for the cache's lifetime. Use `\.self` to select a complete hashable
+/// input, or named tuple members to combine inputs. No dependencies means one shared key.
 ///
 /// Selected values retain their complete concrete values and types. Their equality and
 /// hashing must remain stable while cached; project immutable values from mutable aliases.

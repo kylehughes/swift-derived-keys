@@ -90,7 +90,7 @@ The button's remaining measurement settings stay fixed, including its configurat
 
 Proposal math lives in the closure. Because padding changes the children's inner width, `\.padding` belongs in the parent's dependencies; each child keys the actual proposal it receives. This layout expects an available width and returns that width while computing natural height, so do not pass `greatestFiniteMagnitude` for width.
 
-Every child listed in `children:` contributes to the parent snapshot, even when a branch skips measuring it. Changing a hidden button's title or font can therefore cause a parent miss.
+Every child listed in `children:` contributes its selected dependency values to the parent snapshot, even when a branch skips measuring it. Changing a hidden button's title or font can therefore cause a parent miss.
 
 ### Choose ownership
 
@@ -132,7 +132,7 @@ A composed cache can itself be a child. The [three-level card example](Examples/
 
 For children with different root types, `bound(to:)` creates a measurement handle for a nonoptional key path, as shown above and in the [mapping example](Examples/Size-Caches.md#map-a-child-root). Bindings can be chained through further parents. They reuse the original cache and add no storage, key identity, or snapshot depth.
 
-Use `at(_:)` when only a dependency description is needed; the parent calculation must call the original cache with the corresponding child root. Same-root and bound or mapped children can be mixed, and one child can be mapped to two distinct paths. Each binding reads its own path, so a title and subtitle are captured separately. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
+Use `at(_:)` when you only need a dependency description. In the calculation, call the original cache with the child root from that same path. You can combine same-root, bound, and mapped children, or map one child cache to two distinct paths. Each binding reads its own path, so a title and subtitle are captured separately. The [composition limits](#composition-and-reentrancy) also apply to nested and mapped children.
 
 ### Use a custom measurement recipe
 
@@ -177,7 +177,7 @@ Both proposed dimensions must be finite and nonnegative. NaN, infinity, and nega
 
 ### Composition and reentrancy
 
-Parents capture recursive dependency values even when child result storage is empty; cached sizes and child eviction state never become dependency identity. This is why clearing a child does not invalidate an otherwise valid parent result.
+A parent captures its children's dependency values recursively, even when a child cache is empty. Child sizes and eviction state never enter the parent key, so clearing a child does not invalidate an otherwise valid parent entry.
 
 Dependency composition is immutable and acyclic by construction. The checked limit is 64 snapshot nodes per path: an empty description has depth one, a description with a selected value has depth two, and each parent adds a level. Mapping adds no level. Excess depth fails a precondition.
 
@@ -225,7 +225,7 @@ assert(first == second)
 
 `ResultCache` is a value type: copying it gives independent entry mutation. Its calculation is synchronous and nonthrowing; inputs and results need not be `Hashable` or `Sendable`. Select every variable input the calculation reads, and keep selected values stable while stored.
 
-For main-actor recipes, use `MainActorResultCache` from `DerivedKeysUI`. The [result-cache guide](Examples/Result-Caches.md) shows named tuple inputs and two explicit stages: text to rendered line count, then line count to row height. Text measurement and row layout remain application code.
+For main-actor recipes, use `MainActorResultCache` from `DerivedKeysUI`. The [result-cache guide](Examples/Result-Caches.md) shows named tuple inputs and two explicit stages: measure a string's rendered line count, then compute row height from that count. Text measurement and row layout remain application code.
 
 Use the [generic API guide](Examples/Generic-Core.md) for projections, typed operation keys, and runtime source graphs. `DependencySnapshot` composes heterogeneous captured values directly. `MemoizationCache` supports throwing calculations without insertion on failure, treats a cached optional `nil` as a hit, and gives copied cache values independent storage behavior. The [document export guide](Examples/Document-Export.md) demonstrates these lower-level APIs; run it with `swift run DocumentExportExample`.
 

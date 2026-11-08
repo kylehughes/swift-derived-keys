@@ -30,7 +30,7 @@ Never use a finalized integer hash as a semantic key. Collisions are legal, and 
 
 ``DependencySnapshot/init(value:)`` retains a full hashable value and its concrete type. ``DependencySnapshot/init(children:)`` composes already captured snapshots in order, with the same 64-node depth bound. These unlabeled forms use empty labels and compare equal to equivalent empty-label source snapshots. Use them when the caller already controls dependency selection and isolation; the core adds no UI or global-actor dependency.
 
-The sizing facade in `DerivedKeysUI` captures main-actor key-path values into this representation. Its traversal evaluates each declared occurrence independently, including mapped bindings; that differs from `KeySource`'s request-local shared-node memoization. Both preserve complete values and structure.
+``ResultCache`` in `DerivedKeys` and the main-actor caches in `DerivedKeysUI` capture selected key-path values into this representation. `SizeCache` traversal evaluates each declared child occurrence independently, including mapped bindings; that differs from `KeySource`'s request-local shared-node memoization. All preserve complete values and structure.
 
 ## Choose the cost you need
 

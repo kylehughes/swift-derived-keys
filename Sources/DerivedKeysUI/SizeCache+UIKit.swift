@@ -20,7 +20,7 @@ extension SizeCache where Root: UIView {
     ///   cache, and fails a precondition. For that integration, use a custom recipe that measures
     ///   children or calls a separate uncached routine. Calling the cached override from a
     ///   custom recipe still reenters the cache.
-    /// - Precondition: Capacity is nonnegative and dependency depth is at most `maximumDepth`.
+    /// - Precondition: Capacity is nonnegative.
     public convenience init<each Value>(
         dependingOn paths: repeat KeyPath<Root, each Value>,
         capacity: Int

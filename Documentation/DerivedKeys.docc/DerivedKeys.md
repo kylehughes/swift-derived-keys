@@ -62,7 +62,7 @@ Start with <doc:DependencyDesign> to choose complete dependencies. Use ``ResultC
 
 Use ``RequestKey`` with a small `Hashable` struct for fixed schemas. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled typed composition. ``KeySource`` supports heterogeneous runtime graphs, and ``MemoizationCache`` stores results for bounded synchronous reuse, including throwing calculations.
 
-For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selected key-path dependencies and composes child caches on the main actor. That module's `MainActorResultCache` binds an arbitrary-result calculation to a shared main-actor cache. To cache custom layout results with automatic fitting-proposal keys, such as fitted sizes alongside child frames, use `LayoutCache` in `DerivedKeysUIKit`. `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
+For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selected key paths on the main actor, keys the fitting proposal automatically, and composes child caches. The same module provides `MainActorResultCache` for main-actor calculations with arbitrary result types. To cache custom layout results, such as fitted sizes alongside child frames, use `LayoutCache` in `DerivedKeysUIKit` with explicit inputs and an automatic fitting-proposal key. `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
 
 ## Topics
 

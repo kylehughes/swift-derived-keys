@@ -268,7 +268,9 @@ public final class TextComponentMeasurer {
         )
     }
 
-    /// Measures from the same immutable snapshot used to create the request key.
+    /// Returns a component size using the captured request inputs.
+    ///
+    /// Child cache lookups precede the component lookup; each cache calculates only on a miss.
     public func size(
         for input: TextComponentInput,
         proposal: FittingProposal,

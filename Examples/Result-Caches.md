@@ -24,7 +24,7 @@ assert(words == ["Cached", "search", "tokens"])
 
 Retain the cache across requests. For an application model, select its relevant properties instead of `\.self`. Nested paths and mixed value types work, and the model itself need not be hashable or sendable. An empty dependency selection gives every input the same key, so use it only for a calculation whose result does not vary with the input.
 
-`ResultCache` accepts sendable key paths and a `@Sendable` calculation, allowing synchronous use within a chosen owner without granting actor access. Ordinary nonisolated key-path literals infer the required conformance. Use `MainActorResultCache` for main-actor properties and closures. Neither cache observes input changes or schedules work.
+`ResultCache` requires sendable key paths and a `@Sendable` calculation. These requirements keep actor-isolated reads out of the nonisolated cache API; ordinary nonisolated key-path literals infer the required conformance. When your key paths or calculation need main-actor access, use `MainActorResultCache`. Neither cache observes input changes or schedules work.
 
 ## Pass a line count into a height cache
 
@@ -75,9 +75,9 @@ Recreate the example bundle when its fixed typography changes, including a resol
 
 ### How this differs from size-cache children
 
-Here the application resolves the first cache before looking up the second. The second cache keys the resulting count, so different first-stage inputs can share a result.
+Here the caller resolves the first cache and passes its output to the second. The second cache keys the computed line count, so different strings that wrap to the same number of lines can share one height entry.
 
-`SizeCache` children contribute their original dependency values to a parent's key. That lets a parent hit skip its calculation and all child lookups. Use [size-cache composition](Size-Caches.md) when that behavior fits the layout; use explicit result stages when a computed value should become the next input. Neither API discovers caches called by a recipe.
+`SizeCache` children contribute their original dependency values to a parent's key. That lets a parent hit skip its calculation and all child lookups. Use [size-cache composition](Size-Caches.md) when that behavior fits the layout; use explicit result stages when different inputs can produce the same intermediate result. Neither API discovers caches called by a recipe.
 
 ## Ownership, removal, and correctness
 

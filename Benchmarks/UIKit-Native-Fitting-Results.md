@@ -164,7 +164,7 @@ For warmed labels, dependency capture alone takes about 2.1 µs, compared with r
 
 The standalone long-text snapshot takes 61.71 µs to hash, while a complete warm lookup takes 149.51 µs in the separate diagnostic. The text getter itself takes about 0.33 µs. This is consistent with the earlier [UIKit/model String representation comparison](String-Results.md); this run does not repeat that comparison or measure its model-backed alternative. When a model already owns authoritative text, the [custom model-backed recipe](../Examples/Size-Caches.md#select-authoritative-model-text) remains an option. Keep model and rendered state synchronized, and measure the selected values: a model property does not guarantee native or contiguous string storage. The convenience initializer does not make arbitrary dependency reads cheap or complete.
 
-The document's native button lookup costs more than its warm direct fit in this run, even though it avoids every repeated measurement. A warm parent still benefits because it avoids text fitting and the whole combination. For parent-only misses, it pays for parent capture and child lookups again; those requests still beat direct fitting here. The low-hit mixed parent trace did not benefit. Choose the cache boundary using the full request cost and application hit rate, not the measurement count alone.
+The document's native button lookup costs more than its warm direct fit in this run, even though it skips remeasurement. Warm parent hits and spacing-only misses still benefit from reusing the more expensive text measurement. The low-hit mixed parent trace adds net overhead. Choose the cache boundary using the full request cost and application hit rate, not the measurement count alone.
 
 ## Evidence and limits
 

@@ -117,7 +117,7 @@ public final class DocumentContentView: UIView {
         caches.contentSizes.size(of: self, toFit: size)
     }
 
-    /// Places controls using the same child handles and inner proposal as fitting.
+    /// Places controls using the same child caches and inner proposal as fitting.
     public override func layoutSubviews() {
         super.layoutSubviews()
         let innerProposal = CGSize(width: max(0, bounds.width - 2 * padding), height: CGFloat.greatestFiniteMagnitude)

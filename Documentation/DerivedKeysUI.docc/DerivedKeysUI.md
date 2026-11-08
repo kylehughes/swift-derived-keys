@@ -85,7 +85,7 @@ Create the parent with `makePairSizes(titleSizes: makeTextSizes())`, then pass t
 
 Each lookup uses the original cache; binding adds no storage, key identity, or snapshot depth. Inspect or clear the original cache, since bindings expose no count, capacity, or clearing operations.
 
-Use ``SizeDependencies/at(_:)`` for dependency-only mapping. That descriptor retains dependency readers without retaining the cache, binding, measurement closure, or entries. Parent child-description capture has the same retention rule. A binding itself retains its original cache, so the calculation must capture the handles it calls. The graph is immutable and acyclic by construction; its snapshot depth is checked against ``SizeDependencies/maximumDepth``.
+Use ``SizeDependencies/at(_:)`` when you only need a mapped dependency description. It retains dependency readers without retaining the child cache, binding, measurement closure, or entries. A parent captures child descriptions with the same retention rule. A ``SizeCacheBinding`` does retain its original cache, so capture the handles the calculation calls. The dependency graph is immutable and acyclic by construction, with snapshot depth checked against ``SizeDependencies/maximumDepth``.
 
 ## Ownership and completeness
 

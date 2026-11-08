@@ -6,7 +6,7 @@ Reuse complete UIKit layout results from captured inputs and fitting proposals.
 
 A frame-based view often repeats the same geometry calculation in `sizeThatFits(_:)` and `layoutSubviews()`. Retain a ``LayoutCache`` on the main actor to store an immutable result containing both the fitted size and child frames, then reuse it across calls with equal captured inputs and effective proposals. Views running the same layout algorithm can explicitly share a cache.
 
-For a key-path sizing API with configured measurement recipes and recursive child caches, use `DerivedKeysUI` and `SizeCache`.
+For a key-path sizing API with configured measurement recipes and recursive child caches, use `SizeCache` in `DerivedKeysUI`. That module also provides `MainActorResultCache` for main-actor calculations with arbitrary result types.
 
 ## Capture inputs and fitting proposals
 

@@ -31,6 +31,8 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     private var storage: MemoizationCache<RequestKey<SizeOperation, DependencySnapshot, SizeContext>, CGSize>
 
     /// The number of retained results.
+    ///
+    /// - Precondition: This cache is not measuring.
     public var count: Int {
         checkAccess()
         return Self.count(of: &storage)
@@ -81,6 +83,8 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     }
 
     /// Removes all local results without clearing any child cache.
+    ///
+    /// - Precondition: This cache is not measuring.
     public func removeAll() {
         checkAccess()
         storage.removeAll()
@@ -93,6 +97,7 @@ public final class SizeCache<Root>: SizeDependencies<Root> {
     /// - Parameters:
     ///   - root: The root whose current selected values identify the entry.
     ///   - size: The fitting proposal used for the entry, normalized as during lookup.
+    /// - Precondition: Both proposal axes are finite and nonnegative; this cache is not measuring.
     public func removeSize(of root: Root, toFit size: CGSize) {
         checkAccess()
         storage.removeValue(for: key(of: root, toFit: size))

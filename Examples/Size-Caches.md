@@ -95,7 +95,7 @@ The [compiler fixture](../Fixtures/iOS/READMEExamples.swift) includes the minima
 
 ## Keep proposals with their calculations
 
-The parent keys its own proposal and recursively captured dependency values. Child proposals do not enter the parent key; each child keys the proposal it receives at lookup. Padding, orientation, visibility, and other values used in transformation or combination belong in the parent selection. There is no need to declare the transformation twice.
+A parent keys its own proposal alongside the dependency values captured from itself and its children. Transformed child proposals do not enter the parent key; each child keys the proposal it actually receives at lookup. Select padding, orientation, visibility, and any other values that affect how the parent transforms proposals or combines sizes. You do not need to declare the proposal math outside the measurement closure.
 
 The document example measures inner content at `max(0, outerWidth - 2 * padding)` and unconstrained height. Changing spacing changes only the parent key. Changing padding also changes the child's actual width. Changing the outer height changes the parent request even though this example chooses natural height; its unchanged child proposals can still hit.
 
@@ -138,7 +138,7 @@ func makeArticleTextSizes() -> SizeCache<ArticleView> {
 
 Retain the returned cache in the application's chosen owner, then call `textSizes.size(of: view, toFit: proposal)`. The [complete iOS 16 compiler fixture](../Fixtures/iOS/ModelTextExample.swift) includes the model, view, and an edit followed by another lookup. It fixes wrapping, text-container insets, padding, direction, and editing/scrolling settings; changing any of those requires another dependency. Font is selected explicitly. Model changes schedule layout, while the owner remains responsible for fitting and assigning the view's frame.
 
-Equal strings can have different storage representations and hashing costs. In the [UIKit string measurements](../Benchmarks/String-Results.md), selecting native model text was substantially cheaper for repeated requests than reading identical text back from `UITextView`. Swift model storage is not a guarantee of contiguous UTF-8: a string assigned from UIKit can retain its representation. The package does not normalize strings automatically.
+Equal strings can have different backing storage and hashing costs. In the [UIKit string measurements](../Benchmarks/String-Results.md), selecting native model text was substantially cheaper for repeated requests than reading identical text back from `UITextView`. A model's `String` property does not guarantee contiguous UTF-8: a string assigned from UIKit can keep its bridged representation. DerivedKeys does not normalize strings automatically.
 
 The model must remain authoritative and agree with the rendered content during measurement. If editing happens in the text view, synchronize the model before lookup or select the text view's current text. A stale model key can reuse an incorrect size. Full text remains a valid dependency; no content ID, revision, or custom wrapper is required.
 
@@ -162,4 +162,4 @@ A native-fitting cache calls the passed view's `sizeThatFits(_:)` on a miss. Cal
 
 ## Choose a lower-level result API
 
-Use `DerivedKeysUIKit.LayoutCache` when you want to cache an application-defined result containing complete child frames as well as overall size. Its [frame-layout guide](UI-Measurement.md) shows that explicit-input API. Use the [generic core](Generic-Core.md) for other computations, throwing calculations, typed operation keys, or nonisolated ownership.
+Use `MainActorResultCache` or `ResultCache` for key-path selection with results other than `CGSize`, or when one cached result feeds into the next; see the [result-cache guide](Result-Caches.md). Use `DerivedKeysUIKit.LayoutCache` to cache application-defined results containing overall size and child frames, with explicit inputs and an automatic fitting-proposal key. Its [frame-layout guide](UI-Measurement.md) shows that API. Use the [generic core](Generic-Core.md) for throwing calculations, typed operation keys, or runtime dependency graphs.

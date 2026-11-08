@@ -1,6 +1,6 @@
 # Using the generic key and memoization APIs
 
-Import `DerivedKeys` to select dependencies and manage synchronous reuse directly. Use it for non-UI computations, explicit snapshots, runtime source graphs, or typed operation keys. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache.
+Import `DerivedKeys` to select dependencies and manage synchronous reuse directly. If you want to bind key paths and a nonthrowing calculation once, start with `ResultCache` in the [result-cache guide](Result-Caches.md). Use the lower-level types in this guide for explicit value snapshots, typed operation keys, runtime source graphs, or throwing calculations. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache.
 
 For UI sizing, the [sizing convenience API](../README.md) uses the same snapshots and bounded storage and owns its main-actor measurement recipe. The generic API described here has no main-actor requirement.
 

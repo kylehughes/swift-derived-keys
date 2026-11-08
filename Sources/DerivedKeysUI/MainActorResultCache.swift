@@ -29,6 +29,8 @@ public final class MainActorResultCache<Input, Value> {
     private var storage: MemoizationCache<[DependencySnapshot], Value>
 
     /// The number of retained results.
+    ///
+    /// - Precondition: No operation on this cache is in progress.
     public var count: Int {
         checkAccess()
         return Self.count(of: &storage)

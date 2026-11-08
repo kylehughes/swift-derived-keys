@@ -63,7 +63,7 @@ The bridge reserves the greatest finite value as a sentinel. A manually construc
 
 The cache neither clamps nor rounds a result. Pass the proposal you actually use for measurement. If your algorithm intentionally ignores height, construct a width-only proposal in both `sizeThatFits(_:)` and `layoutSubviews()`; keying one with natural height and the other with `bounds.height` would describe different requests.
 
-The compiled `LabelView` example fills a finite requested width and returns natural height. A parent assigns the fitted frame before normal UIKit layout. A natural-width request uses an unconstrained proposal, so assigning its finite result produces a distinct request on the following layout pass. Widths at or below twice the fixed padding yield zero-width text; invalid widths return zero at the view boundary. These are example policies, not rules imposed by the library.
+The compiled `LabelView` example fills a finite requested width and returns natural height. A parent assigns the fitted frame before normal UIKit layout. If the caller requests natural width with an unconstrained proposal, assigning the resulting finite width gives the following layout pass a different cache key. Widths at or below twice the fixed padding yield zero-width text; invalid widths return `.zero` at the view boundary. These are example policies, not rules imposed by the library.
 
 ## Share and compose
 
