@@ -58,9 +58,11 @@ The cache hit skips the calculation closure. The uppercase request has different
 
 ## Choose the API for your dependencies
 
-Start with <doc:DependencyDesign> to choose complete dependencies. Use ``RequestKey`` with a small `Hashable` struct for fixed schemas. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled typed composition. ``KeySource`` supports heterogeneous runtime graphs, and ``MemoizationCache`` stores results for bounded synchronous reuse.
+Start with <doc:DependencyDesign> to choose complete dependencies. Use ``ResultCache`` to bind key paths and a nonthrowing calculation once, then call `value(for:)` with each input. Named tuple inputs combine values without a custom request type; select every relevant tuple field explicitly. The cache is a value type, and copied caches mutate their entries independently.
 
-For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selected key-path dependencies and composes child caches on the main actor. To cache custom layout results, such as fitted sizes alongside child frames, use the validated fitting proposals and main-actor `LayoutCache` in `DerivedKeysUIKit`. `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
+Use ``RequestKey`` with a small `Hashable` struct for fixed schemas. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled typed composition. ``KeySource`` supports heterogeneous runtime graphs, and ``MemoizationCache`` stores results for bounded synchronous reuse, including throwing calculations.
+
+For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selected key-path dependencies and composes child caches on the main actor. That module's `MainActorResultCache` binds an arbitrary-result calculation to a shared main-actor cache. To cache custom layout results with automatic fitting-proposal keys, such as fitted sizes alongside child frames, use `LayoutCache` in `DerivedKeysUIKit`. `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
 
 ## Topics
 
@@ -84,4 +86,5 @@ For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selecte
 
 ### Reuse a result
 
+- ``ResultCache``
 - ``MemoizationCache``

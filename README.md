@@ -152,9 +152,9 @@ For the short sizing API, add `.product(name: "DerivedKeysUI", package: "swift-d
 
 | Product | Use |
 | --- | --- |
-| `DerivedKeysUI` | Key-path size recipes, typed child mappings, and recursive size caching. |
+| `DerivedKeysUI` | Key-path size recipes, recursive size caching, and `MainActorResultCache` for other results. |
 | `DerivedKeysUIKit` | Explicit fitting proposals and `LayoutCache` for caller-defined complete layout results such as sizes plus frames. |
-| `DerivedKeys` | General-purpose keys, projections, snapshots, sources, and value-semantic memoization. |
+| `DerivedKeys` | `ResultCache`, general-purpose keys and projections, and value-semantic memoization. |
 
 ### Compatibility
 
@@ -199,53 +199,35 @@ In the [recorded Simulator run](Benchmarks/UIKit-Native-Fitting-Results.md), war
 
 ## Use the generic core
 
-The `DerivedKeys` core uses only the Swift standard library and has no global-actor requirement. This exporter captures text and an export option, so changing selection preserves the cached result:
+The `DerivedKeys` core uses only the Swift standard library and has no global-actor requirement. `ResultCache` binds selected key paths and a calculation once. This cache tokenizes a model's text; changing selection leaves its cached result available:
 
 ```swift
 import DerivedKeys
 
-enum ExportOperation {}
-
-struct Document {
+struct SearchDocument {
     var text: String
     var isSelected: Bool
 }
 
-struct ExportInput: Hashable {
-    let text: String
-    let uppercase: Bool
+var tokens = ResultCache<SearchDocument, [String]>(
+    dependingOn: \.text,
+    capacity: 128
+) { document in
+    document.text.split(whereSeparator: \.isWhitespace).map(String.init)
 }
 
-struct Exporter {
-    private var cache = MemoizationCache<
-        RequestKey<ExportOperation, ExportInput, String>, String
-    >(capacity: 32)
-
-    mutating func export(_ document: Document, uppercase: Bool) -> String {
-        let input = ExportInput(text: document.text, uppercase: uppercase)
-        let key = RequestKey(
-            operation: ExportOperation.self,
-            dependencies: input,
-            context: "plain-text"
-        )
-        return cache.value(for: key) {
-            input.uppercase ? input.text.uppercased() : input.text
-        }
-    }
-}
-
-var exporter = Exporter()
-var document = Document(text: "Hello", isSelected: false)
-let first = exporter.export(document, uppercase: false)
+var document = SearchDocument(text: "Shared cache results", isSelected: false)
+let first = tokens.value(for: document)
 document.isSelected = true
-let second = exporter.export(document, uppercase: false) // Retained cache hit.
-let capitals = exporter.export(document, uppercase: true) // Different key.
-assert(first == second && capitals == "HELLO")
+let second = tokens.value(for: document) // Reuses the first result.
+assert(first == second)
 ```
 
-Changing text or the export option selects another entry; returning to earlier inputs can reuse a retained result. The [document export guide](Examples/Document-Export.md) describes the runnable example with ordered paragraphs and formats. Run it with `swift run DocumentExportExample`.
+`ResultCache` is a value type: copying it gives independent entry mutation. Its calculation is synchronous and nonthrowing; inputs and results need not be `Hashable` or `Sendable`. Select every variable input the calculation reads, and keep selected values stable while stored.
 
-Use the [generic API guide](Examples/Generic-Core.md) for projections, typed operation keys, and runtime source graphs. `DependencySnapshot` also composes heterogeneous captured values directly. `MemoizationCache` supports throwing calculations without insertion on failure, treats a cached optional `nil` as a hit, and gives copied cache values independent storage behavior.
+For main-actor recipes, use `MainActorResultCache` from `DerivedKeysUI`. The [result-cache guide](Examples/Result-Caches.md) shows named tuple inputs and two explicit stages: text to rendered line count, then line count to row height. Text measurement and row layout remain application code.
+
+Use the [generic API guide](Examples/Generic-Core.md) for projections, typed operation keys, and runtime source graphs. `DependencySnapshot` composes heterogeneous captured values directly. `MemoizationCache` supports throwing calculations without insertion on failure, treats a cached optional `nil` as a hit, and gives copied cache values independent storage behavior. The [document export guide](Examples/Document-Export.md) demonstrates these lower-level APIs; run it with `swift run DocumentExportExample`.
 
 ## Further documentation
 
@@ -253,6 +235,7 @@ Use the [generic API guide](Examples/Generic-Core.md) for projections, typed ope
 | --- | --- |
 | Map child roots or follow the complete ownership example | [Composing size caches](Examples/Size-Caches.md) |
 | Look up the sizing API | [SizeCache reference](Documentation/DerivedKeysUI.docc/DerivedKeysUI.md) |
+| Cache other results or pass a result to another cache | [Configured result caches](Examples/Result-Caches.md) |
 | Cache child frames as well as the overall size | [Explicit layout results](Examples/UI-Measurement.md) |
 | Choose dependencies for a non-UI computation | [Core dependency design](Documentation/DerivedKeys.docc/DependencyDesign.md) |
 | Evaluate cache costs | [Release benchmarks](Benchmarks/README.md), with workloads, measured results, and measurement limits |

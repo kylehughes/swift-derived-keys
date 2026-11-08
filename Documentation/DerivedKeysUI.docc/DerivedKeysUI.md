@@ -97,7 +97,19 @@ Each cache uses the generic core's bounded LRU. Zero capacity disables storage. 
 
 Because the UIKit convenience initializer calls the supplied view's `sizeThatFits(_:)` on a miss, do not call that cache from inside the same view's `sizeThatFits(_:)` override. Use the closure initializer and compute the size from child caches or a separate uncached helper. Calling the cached override inside a custom recipe still reenters the cache. Neither initializer discovers undeclared inputs or makes mutable `Hashable` aliases stable.
 
+## Cache other results
+
+Use ``MainActorResultCache`` to bind key paths and a synchronous nonthrowing calculation that returns any value. Multiple inputs can travel in a named tuple; select each field that affects the result. This facade does not automatically include or normalize fitting proposals.
+
+Resolve result stages explicitly: look up a line count, then pass that count into another cache. A later stage keys the values you select from that result. This differs from ``SizeCache`` children, whose original dependencies enter the parent's key without evaluating their results.
+
+The facade shares entries through reference ownership and uses the same bounded LRU storage as the sizing API. Core `ResultCache` offers value-semantic ownership for nonisolated recipes. Neither facade provides built-in text measurement or schedules layout.
+
 ## Topics
+
+### Cache other results
+
+- ``MainActorResultCache``
 
 ### Measure and reuse
 

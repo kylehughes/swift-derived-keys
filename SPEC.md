@@ -278,6 +278,22 @@ View reuse must work without view identity in the key: two views with equivalent
 
 Changing a dependency, requesting another size, scheduling layout, and publishing that size to a container are separate actions. The hashing library must not claim to schedule or repair UI layout automatically.
 
+### 8d. Configured arbitrary-result caches
+
+Provide `ResultCache<Input, Value>` in the standard-library-only core and `MainActorResultCache<Input, Value>` in `DerivedKeysUI`. Both bind inferred heterogeneous key paths, a local capacity, and one synchronous nonthrowing calculation at initialization. Lookups use `value(for:)`; removal uses the current input's selected values. Expose `count`, `capacity`, and `removeAll()` without exposing implementation keys.
+
+Only selected values enter keys. Accept nested and zero key paths; use `\.self` explicitly for a complete immutable input. Named Swift tuples carry multiple inputs without introducing contextual cache types or special lookup overloads. Inputs and results need not be Hashable or Sendable; selected values must be Hashable and stable while cached. Capture each path once before lookup, then pass the input to the configured calculation on a miss. Callers keep the input consistent and select every variable value affecting the result.
+
+The core facade is a non-Sendable value type with independent entry mutation after copying, a `@Sendable` initializer calculation, and sendable key paths. It requires exclusive mutable access; same-cache reentry remains unsupported. The UI facade is a main-actor reference type accepting main-actor recipes and ordinary key paths. It guards same-cache reentry before dependency capture or calculation, including count inspection, removal, and clearing; immutable capacity remains readable. Distinct cache calls are allowed.
+
+Reuse the existing concrete-value `DependencySnapshot` representation and bounded `MemoizationCache` storage, preserving collision equality, optional nil hits, capacity zero, LRU order, and local clearing. Configured recipes and readers remain retained; entries retain selected values and results without implicitly retaining inputs. Reference-valued selections, results, and captures can retain objects. Copying core caches does not deep-copy those objects.
+
+Keep result stages explicit: resolve one cache, then supply its output to the next. Add no automatic result traversal, pipelines, child declarations, mapping handles, fitting normalization, or layout observation to these facades. Existing size-cache composition and generic throwing APIs retain their contracts.
+
+Demonstrate text and width to line count, then count to height, in the application example target. Count actual TextKit line fragments under a fixed plain-text font and line-grid policy. Require finite positive text width, count empty text as zero lines, and include the final empty line after a nonempty string's trailing paragraph separator. Font, line height, and padding stay fixed for the bundle's lifetime; recreate it on typography changes. Use native model strings, retain independent bounded stages, and avoid capturing the owner. Explain that the cheap height formula can be calculated directly and is not evidence of a caching speedup. Demonstrate a non-UI configured cache for tokenized search text.
+
+Validate selected and unselected changes, mixed/nested/zero/scalar/tuple inputs, stable projections, collisions, optional nil, eviction, capacity zero, clearing, value-copy independence, shared reference ownership, input release, and main-actor reentry diagnostics. Compile both valid public-import use and rejected isolation/type violations, including UIKit key paths at the iOS 16 minimum. Verify actual text and width invalidation and downstream reuse for different text with equal line counts.
+
 ## 9. Non-UI example
 
 Demonstrate a document exporter with the same key primitives and cache:

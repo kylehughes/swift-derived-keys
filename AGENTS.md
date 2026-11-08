@@ -4,8 +4,9 @@ DerivedKeys separates dependency selection, immutable semantic keys, and synchro
 
 ## Package boundaries
 
-- `DerivedKeys` is standard-library-only and nonisolated. Keep UI types out of this target.
+- `DerivedKeys` is standard-library-only and nonisolated. Keep UI types out of this target. `ResultCache` binds a nonthrowing recipe to selected key paths with value-semantic storage.
 - `DerivedKeysUI` is the key-path sizing facade. Recipes and recursive descriptions are immutable, read on the main actor, and keep capacity local. Both proposal axes and transitive full-value snapshots enter the key; parents never inspect child result storage to form keys.
+- `MainActorResultCache` in `DerivedKeysUI` caches arbitrary results by selected key paths. It is a main-actor reference facade; it has no implicit fitting proposal or child-composition behavior.
 - `DerivedKeysUIKit` is the supported fitting and layout-cache product. Its main-actor reference cache automatically keys the effective fitting proposal; captured inputs and result values remain caller-owned semantic contracts.
 - `DerivedKeysUIExample` is a non-product target containing tested frame-layout and text/button examples. See [the sizing guide](Examples/Size-Caches.md) for fitting, cache sharing, and application layout responsibilities.
 - `DocumentExportExample` is a runnable non-UI consumer. [UIKit benchmarks](Benchmarks/README.md) compare real sizing paths; `DerivedKeysBenchmarks` retains synthetic key and cache diagnostics.
@@ -18,6 +19,8 @@ Keys retain complete values and structure, not hashes alone. Never weaken concre
 Preserve concrete hashing and equality through type erasure in both direct snapshots and `KeySource` construction. `DependencySnapshot` wraps each value in a private generic `Hashable` type before erasing it with `AnyHashable`; this avoids expensive element erasure for arrays. Representation changes need correctness coverage and representative UIKit benchmark evidence. Ordinary callers must not need custom wrappers to avoid internal overhead.
 
 Cache entries must not retain providers or per-request calculation closures. Keep optional nil hits, noninsertion after failed calculations, LRU order, and copy independence covered.
+
+Configured result caches retain one recipe and use ordered `DependencySnapshot` values with the existing LRU. Only selected values form keys, including explicitly selected named tuple fields; `\.self` selects a whole input. Keep the core facade's sendable key-path and calculation boundaries, without requiring inputs or results to be Sendable. Main-actor result-cache guards cover dependency capture and calculation, including inspection and removal. Entries do not implicitly retain roots; captures, reference-valued dependencies, and results can retain them. See [result stages](Examples/Result-Caches.md) for ownership and the application-owned TextKit example.
 
 ## Sizing API and ownership
 

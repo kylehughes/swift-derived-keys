@@ -1,4 +1,4 @@
-"""Observe public SizeCache preconditions in isolated debug child processes."""
+"""Observe public cache preconditions in isolated debug child processes."""
 import json
 from pathlib import Path
 import resource
@@ -39,6 +39,13 @@ def main():
                       "leaf-depth-65": "SizeCache dependency depth exceeds maximumDepth."})
         cases.update({name: "SizeCache cannot be reentered while its measurement recipe is running."
                       for name in ["reentry", "warm-hit-reentry", "count-reentry", "remove-reentry", "remove-all-reentry", "bound-reentry"]})
+        cases.update({"result-valid": None, "result-distinct-cache-nesting": None,
+                      "result-negative-capacity": "MainActorResultCache capacity must be nonnegative.",
+                      "result-core-negative-capacity": "Cache capacity must be nonnegative."})
+        cases.update({f"result-{phase}-{operation}":
+                      "MainActorResultCache cannot be reentered while an operation is in progress."
+                      for phase in ("capture", "compute", "removal")
+                      for operation in ("lookup", "count", "remove", "clear")})
         for operation in ("size", "remove", "bound"):
             for axis in ("width", "height"):
                 for invalid in ("nan", "infinity", "negativeInfinity", "negative"):

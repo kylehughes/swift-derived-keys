@@ -1,7 +1,26 @@
 import DerivedKeys
 
-// Mirrors the complete sample in Examples/Document-Export.md and README.md.
+// Mirrors the complete ResultCache sample in README.md.
 func readmeGenericExample() {
+    struct SearchDocument {
+        var text: String
+        var isSelected: Bool
+    }
+    var tokens = ResultCache<SearchDocument, [String]>(
+        dependingOn: \.text,
+        capacity: 128
+    ) { document in
+        document.text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+    var document = SearchDocument(text: "Shared cache results", isSelected: false)
+    let first = tokens.value(for: document)
+    document.isSelected = true
+    let second = tokens.value(for: document)
+    assert(first == second)
+}
+
+// Mirrors the complete sample in Examples/Document-Export.md.
+func documentExportGuideExample() {
     enum ExportOperation {}
 
     struct Document {

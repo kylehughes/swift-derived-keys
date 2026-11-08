@@ -18,6 +18,11 @@ struct PreconditionProbe {
         let arguments = CommandLine.arguments
         guard arguments.count == 2 else { fatalError("Expected one named probe") }
         let name = arguments[1]
+        if name.hasPrefix("result-") {
+            ResultCacheProbes.run(name)
+            print("Completed \(name)")
+            return
+        }
         let root = Root()
         let proposal = CGSize(width: 100, height: 20)
         switch name {
