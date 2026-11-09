@@ -1,28 +1,28 @@
 # Technical specification: dependency-composed keys in Swift
 
-Use the [README](README.md) for package usage and [maintenance guide](Documentation/Maintenance.md) for local check commands. The requirements below cover the generic core, UI support, and their validation.
+See the [README](README.md) for package usage and the [maintenance guide](Documentation/Maintenance.md) for local check commands. This specification defines the normative requirements for the generic `DerivedKeys` core, the `DerivedKeysUI` module, and their validation suites.
 
 [Correctness contract](#2-fundamental-correctness-contract) · [Key-path sizing](#8a-key-path-size-recipes) · [Performance](#10-performance-requirements) · [Acceptance](#11-acceptance-criteria-and-deliverables)
 
 ## 1. Purpose and scope
 
-Implement a reusable Swift library for deriving hashable keys from the subset of state that affects a particular computation.
+Implement a reusable Swift library that derives hashable keys from the subset of state affecting a specific computation.
 
-A primary use case is caching UI measurements: two model configurations can reuse a component's measured size when their layout-relevant state and measurement environment are equivalent, even if other model properties differ.
+A primary use case is caching UI measurements: two model states can reuse a component's measured size whenever their layout-relevant properties and measurement environment match, even if unrelated model properties differ.
 
-The core must remain domain-independent. It must support computations such as document transformation, parsing, formatting, or other deterministic derived values without importing UI frameworks or assuming the main actor.
+The core module (`DerivedKeys`) must remain domain-independent. It must support deterministic derived computations—such as document transformation, parsing, and formatting—without importing UI frameworks or assuming main-actor isolation.
 
-Separate three responsibilities:
+The design must separate three responsibilities:
 
 - Selecting and composing dependencies.
 - Evaluating those dependencies into an immutable key.
-- Using the key to reuse a computed result.
+- Using the key to reuse a computed result in a cache.
 
-A cache is one consumer of the key abstraction. UI measurement is one application of that cache.
+A cache is one consumer of the key abstraction, and UI measurement is one application of that cache.
 
-Use Swift 6 language mode and strict concurrency checking. Build with the latest stable Swift toolchain, recording the exact compiler, package tools version, supported platforms, and default actor isolation. The generic target must not inherit UI-specific isolation.
+Build in Swift 6 language mode with strict concurrency checking enabled under the latest stable Swift toolchain, recording the exact compiler version, SwiftPM tools version, minimum deployment targets, and default actor isolation. The generic core target must not inherit UI-specific actor isolation.
 
-In this specification, **must** identifies a correctness or delivery requirement; **should** identifies a recommendation that requires a documented reason to depart from; **may** identifies an optional extension. This is an implementation contract, not a claim that an implementation has already been tested.
+In this specification, **must** identifies a mandatory correctness or delivery requirement, **should** identifies a strong recommendation that requires a documented reason to depart from, and **may** identifies an optional extension. This document specifies the required contract; conformance is established only by passing the validation suite.
 
 ## 2. Fundamental correctness contract
 
@@ -39,15 +39,11 @@ the application must uphold:
 key(a) == key(b)  implies  compute(a) and compute(b) are interchangeable
 ```
 
-"Interchangeable" includes everything the caller observes in the returned result. Cached computations must not depend on side effects that need to occur on every call.
+"Interchangeable" covers every aspect of the returned value that the caller observes. Cached computations must not rely on side effects that need to run on every request.
 
-The reverse implication is unnecessary. Two different keys may produce equal results. Conservatively including an extra dependency reduces cache hits but remains correct; omitting a dependency that can change the result can return a wrong result.
+The converse does not need to hold: two unequal keys may legitimately produce equal results. Including an extra dependency conservatively reduces cache hits without breaking correctness, whereas omitting a dependency that can alter the result can return a wrong result.
 
-A key expresses equivalence for one computation, not necessarily model equality, entity identity, or visual equality.
-
-Do not change a model's general-purpose `Equatable` or `Hashable` conformance to implement this narrower equivalence. Define a separate projection or key type. One model may expose several projections for different computations.
-
-Examples:
+A key represents equivalence for a single computation, not general model equality, entity identity, or visual identity. Callers must not alter a model's general-purpose `Equatable` or `Hashable` conformance to express calculation-specific equivalence; instead, define a separate projection or key for each calculation. A single model may have different projections for different calculations:
 
 | Change | Text measurement | Exported document |
 | --- | --- | --- |
@@ -56,21 +52,19 @@ Examples:
 | Share-action callback changes | Irrelevant | Irrelevant |
 | Export format changes | Irrelevant | Relevant |
 
-These classifications depend on the actual calculation. The library cannot infer complete dependencies from a model's fields.
+Whether an input is relevant depends on what the calculation actually reads; the library cannot infer completeness from a model's stored properties.
 
 ## 3. Sources, composition, and evaluated keys
 
-Provide three conceptual building blocks. Public names may differ, but their semantics must remain explicit.
+Provide three conceptual building blocks (public type names may differ, provided these semantics remain explicit):
 
-**Original source.** A labeled leaf that supplies a `Hashable` dependency value. Support direct immutable values and a provider that obtains the current value. A provider is evaluated when the key is requested, not only when the source is constructed.
+- **Original source.** A labeled leaf node that supplies a `Hashable` dependency value, supporting both constant immutable values and a provider closure that reads the current value on evaluation. Providers must run when a key snapshot is requested, not only when the source is constructed.
+- **Derived source.** A labeled, ordered composition of original or derived sources. Compositions may combine heterogeneous value types and nest arbitrarily (up to the supported depth limit). Appending a child source must return a new composition and leave the existing composition unchanged.
+- **Evaluated key.** An immutable, value-semantic snapshot of the captured dependency values and their structure, suitable for use as a `Dictionary` key. A live source whose output can change over time must never itself conform to `Hashable` or be used directly as a dictionary key.
 
-**Derived source.** A labeled, ordered composition of original or derived sources. Compositions may contain heterogeneous value types and may nest. Appending a dependency creates a new composition and leaves the old composition unchanged.
+Every captured dependency value must keep stable equality and hashing for the lifetime of an evaluated key. Conforming to `Hashable` is not sufficient by itself: for mutable reference types, callers must project an immutable value snapshot rather than storing the mutable reference. The library does not deep-copy arbitrary reference graphs automatically.
 
-**Evaluated key.** An immutable, value-semantic snapshot of the dependency values and their structure. This is the object used as a dictionary key. A live source whose output changes over time must never itself be stored as a dictionary key.
-
-Dependency inputs must have stable equality and hashing for the lifetime of an evaluated key. `Hashable` alone does not guarantee this. For mutable reference-backed state, callers must supply an immutable projection or an explicit snapshot operation; retaining the reference is insufficient. The library does not automatically deep-copy arbitrary values.
-
-The conceptual snapshot representation is:
+Conceptually, snapshots have three forms:
 
 ```text
 Original(label, value-type, captured-value)
@@ -78,70 +72,62 @@ Derived(label, ordered-child-snapshots)
 Request(operation-domain, algorithm-version, dependencies, context)
 ```
 
-The implementation may encode these distinctions through concrete generic types rather than storing textual tags or runtime type metadata.
+An implementation may encode these forms in static generic types on typed paths rather than storing string tags or runtime type metadata.
 
-Required composition semantics:
+Compositions and snapshots must satisfy these structural rules:
 
-- Labels distinguish dependency roles within a declared schema.
-- Original and derived forms are distinct.
-- Dependency order, multiplicity, optional presence, and collection boundaries are preserved.
-- Empty derived compositions are valid constants within their namespace.
-- Nested structure is preserved; do not silently flatten it.
-- Replacing a variable used to build a composition does not retroactively modify that composition.
-- Shared live sources may supply new values on later evaluations; previously evaluated keys remain unchanged.
-- Independent source instances with equal schemas and equal captured values produce equal keys. Source object identity is not part of result equivalence.
+- Labels distinguish dependency roles within a schema.
+- Original (leaf) and derived (composite) forms never compare equal to each other.
+- Child order, multiplicity, optional presence (`Optional.some` vs `Optional.none`), and collection boundaries are preserved.
+- Empty derived compositions are valid constants within their labeled namespace.
+- Nested hierarchy is preserved and never silently flattened.
+- Rebinding a variable used to construct a composition does not mutate that composition.
+- Shared live sources may return different values on subsequent evaluations without altering previously evaluated keys.
+- Independent source graphs with identical schemas and equal captured values produce equal snapshots; source instance identity does not affect key equality.
 
-An ordered collection must use order-sensitive equality. Unordered input must use an order-independent representation or explicit canonicalization appropriate to the computation. Do not rely on incidental dictionary iteration order.
+Ordered collections must use order-sensitive equality, while unordered inputs must use an order-independent representation or explicit canonicalization suited to the calculation. Never depend on `Dictionary` or `Set` iteration order.
 
-Prefer typed structs and generic composition on common paths. Type erasure may support heterogeneous runtime collections, but must preserve node kind, namespace, concrete value-type distinctions, structural equality, and ownership/isolation constraints. Erasure must not reduce each dependency to an integer.
+Prefer static generic structs on fixed-schema paths. Type-erased snapshots may support heterogeneous runtime graphs, provided erasure preserves node kind (leaf vs composite), label namespace, concrete leaf value type, structural equality, and isolation rules. Type erasure must never collapse a dependency leaf into an integer hash alone.
 
 ## 4. Hashing and equality
 
-Use Swift `Hashable` semantics: equal keys must hash equally; equal hashes do not establish equal keys. Hashing selects candidates; equality determines whether reuse is valid. [Swift Hashable documentation](https://developer.apple.com/documentation/swift/hashable).
+Follow standard Swift `Hashable` semantics ([Swift `Hashable` documentation](https://developer.apple.com/documentation/swift/hashable)): equal keys must produce equal hashes, while equal hashes do not imply equal keys. Hashing selects bucket candidates; full key equality decides whether a cached result may be reused.
 
-The cache must retain enough information to compare complete semantic keys. Store entries by a `Hashable` key, rather than by its `hashValue` or a finalized `Int` alone.
+Caches must retain complete semantic keys and store entries by a `Hashable` key type rather than by `hashValue` or a finalized `Int` digest alone. A hash collision must never return another key's cached result at any level of composition—retaining only child hashes before forming a parent key is prohibited because it discards value equality. A precomputed hash digest may be cached alongside an immutable snapshot as an optimization only if `==` still compares the full semantic key when hashes match, and equal keys always use the same hashing scheme and seed policy.
 
-A hash collision must never return another key's result. This applies at every composition level: retaining only child hashes discards information before the parent key is formed.
+Swift `Hasher` output is randomly seeded per process and may vary across launches or standard-library releases ([Swift `Hasher` documentation](https://developer.apple.com/documentation/swift/hasher)). Never persist `Hasher` output, transmit it across processes, or use it as a content identifier.
 
-A precomputed digest is permitted as an optimization if it is derived from an immutable snapshot and equality still checks the semantic key when necessary. Equal keys must use the same hashing scheme and seed policy.
-
-Swift `Hasher` output is process-local and may change between executions or standard-library versions. Do not persist it, transmit it as a stable identifier, or promise deterministic numeric values. Stable serialization and cryptographic fingerprints are separate features. [Swift Hasher documentation](https://developer.apple.com/documentation/swift/hasher).
-
-An operation's namespace must distinguish computations that happen to receive the same dependency values. Prefer separate nominal key types or a typed operation token. Shared erased storage must preserve that distinction. A free-form diagnostic label alone is insufficient to prevent unrelated operations from sharing entries accidentally.
-
-Algorithm versions distinguish concurrently valid implementations when necessary. A process-local cache discarded on launch does not need versioning solely for app updates.
+Operation namespaces must keep unrelated calculations from colliding when they happen to select the same dependency types and values. Use distinct nominal operation types (or typed operation tokens) and preserve that separation across type-erased storage; a free-form string label alone is insufficient to isolate unrelated operations. Use an explicit algorithm `version` when concurrently active algorithms must coexist; an in-memory cache discarded on process launch does not require versioning solely for app binary updates.
 
 ## 5. Evaluation, mutation, and consistency
 
-The required baseline is **pull on evaluation**:
+The baseline evaluation model is **pull on evaluation**:
 
-1. Capture the inputs for one calculation request.
-2. Evaluate the relevant dependency projection.
-3. Form one immutable request key.
-4. Look up that key.
-5. On a miss, calculate from the same captured inputs and store the result under that key.
+1. Capture the inputs for a single request.
+2. Evaluate the dependency projection against those inputs.
+3. Form an immutable request key.
+4. Look up the key in the cache.
+5. On a miss, run the recipe against those same captured inputs and store the result under that key.
 
-Reevaluate providers when a new snapshot is requested. Hashing an existing snapshot reads only its captured values. Do not introduce a requirement to send change notifications before a later lookup can observe changed state.
+Reevaluating a source graph must invoke its providers for the current request, whereas hashing or comparing an already-evaluated snapshot must read only its stored values. Callers must not be required to post invalidation notifications before a subsequent lookup can observe updated state.
 
-Provide an explicit-input path, such as a projection from an immutable input snapshot, as the preferred way to maintain consistency and avoid retaining a model owner. A live provider adapter may capture current state within its owner's isolation and then use the same path.
+Provide an explicit-input path—projecting a key from an immutable input value—as the primary mechanism for keeping key evaluation and miss calculation consistent without retaining a model owner. Live provider closures may read state within their owner's actor isolation and delegate to the same snapshot representation.
 
-Providers must be synchronous, side-effect-free reads for the duration of evaluation. They must not mutate dependencies, recursively evaluate the same source graph, perform I/O, or suspend. Capture time, randomness, external configuration, or resource versions explicitly if they affect the computation.
+During evaluation, providers must be synchronous, side-effect-free reads: they must not mutate dependencies, recursively evaluate the same source graph, perform I/O, or suspend. Any time, randomness, external configuration, or resource version that affects the output must be captured as an explicit input.
 
-A request must represent one coherent input state. Merely reading several individually synchronized properties is insufficient if their values can change between reads. Capture related state together or evaluate and calculate in one non-suspending operation within its mutation owner's isolation.
+A request must observe a single coherent state. Reading individually synchronized properties one by one is insufficient if concurrent mutations can interleave between reads; either capture related state atomically into a value snapshot or run key evaluation and miss calculation together inside one non-suspending turn of the state owner's isolation.
 
-If a shared source appears multiple times, every occurrence in one evaluation must observe the same captured value. This can follow from an immutable input snapshot; a graph evaluator may instead use request-local memoization. Evaluation identity used for memoization must not become part of the semantic key.
+When a shared `KeySource` node appears multiple times in one graph, every occurrence within a single `snapshot(for:)` call must observe the same captured value, either because all reads draw from an immutable input or through request-local node memoization. The node identity used for request-local memoization must not enter the semantic key.
 
-Support acyclic composition. Immutable construction from existing children is the preferred baseline. If mutable graph edges or recursive custom sources are exposed, detect cycles and fail with a documented diagnostic rather than hanging or overflowing the stack.
+Compositions must be acyclic. Immutable bottom-up construction is the baseline; if mutable edges or recursive sources are ever exposed, cycles must be detected deterministically rather than hanging or overflowing the call stack.
 
-Do not expose an `update()` method that silently does nothing. If a later optimization introduces pushed invalidation, specify it separately, including mutation coverage, dependency propagation, ownership, revision semantics, and overflow handling. It must not change the meaning of equal keys.
+Do not expose no-op invalidation stubs (such as an `update()` method that does nothing). If push-based invalidation is added in the future, specify its mutation coverage, propagation, ownership, revision overflow, and equivalence rules separately.
 
-When all captured dependency values return to their previous values, the evaluated key must equal the previous key. Content revisions may conservatively prevent reuse after content returns to an earlier value; document this behavior.
+When all selected dependencies change from `A` to `B` and back to `A`, the evaluated key must again equal the original `A` key (unless the caller explicitly uses a monotonic content revision that conservatively treats the reverted edit as a new revision, which must be documented).
 
 ## 6. Generic cache contract
 
-Supply a small generic reference implementation of a cache to demonstrate how the keys are used. Its key and result types must be independent of UI frameworks.
-
-A suitable API shape is:
+Provide a bounded, generic value-type cache in `DerivedKeys` whose key and value types have no UI framework dependencies:
 
 ```swift
 // Contract sketch; exact spelling is an implementation decision.
@@ -158,88 +144,123 @@ struct MemoizationCache<Key: Hashable, Value> {
 }
 ```
 
-Requirements:
+`MemoizationCache` must satisfy these requirements:
 
-- A hit returns the cached value and does not invoke `compute`.
-- A miss invokes `compute` once for that synchronous call, returns its result, and inserts it on success.
-- A thrown error creates no entry and propagates to the caller.
-- A cached `Optional.none` must remain distinguishable from a missing entry.
-- Equal keys must refer to interchangeable computations even if callers provide different closure instances. Closure identity is not a key.
-- Cache keys and results must not change through externally mutable aliases in a way that changes their promised meaning. Prefer value types or documented immutable references.
-- Require an explicit nonnegative capacity. Zero disables storage while still allowing computation.
-- Use a documented bounded eviction policy. LRU is the reference policy: hits and successful insertions mark entries most recently used, and excess entries evict the least recently used.
-- Provide per-key removal, full clearing, and a readable entry count.
-- Eviction affects performance, not result correctness.
+- **Hit behavior:** A cache hit returns the stored value without calling `compute`.
+- **Miss behavior:** A cache miss calls `compute` once synchronously, returns its result, and stores the entry if `compute` succeeds.
+- **Error handling:** If `compute` throws, the cache must not insert or overwrite an entry and must rethrow the error to the caller.
+- **Optional values:** When `Value` is an `Optional`, a cached `.none` (`nil`) must be stored and returned as a hit, distinct from a missing key.
+- **Closure independence:** Equal keys must represent interchangeable results regardless of closure identity; `compute` is never part of the key.
+- **Value stability:** Stored keys and results must not mutate through external reference aliases in ways that alter key equality or result semantics.
+- **Capacity and LRU eviction:** Require an explicit nonnegative `capacity` (`capacity < 0` fails a precondition). A capacity of `0` disables storage while still running `compute` on every call. Positive capacities use least-recently-used (LRU) eviction: hits and insertions mark the entry as most recently used, and inserting into a full cache evicts the least recently used entry. Eviction affects only hit rate, never correctness.
+- **Inspection and removal:** Expose `count`, `capacity`, `removeValue(for:)`, and `removeAll()`.
+- **Entry retention:** The cache retains only evaluated keys and results—never provider closures, per-request `compute` closures, views, or source graphs.
+- **Exclusivity and reentrancy:** Exclusive `inout` mutation is sufficient for the synchronous value-type cache. Reentering the same cache instance from inside `compute` is unsupported and must be documented; composing distinct cache instances is supported.
 
-The cache owns evaluated keys and results. It must not retain providers, calculation closures, views, or entire source graphs after a request merely to support a cached entry.
-
-A synchronous value-type cache with exclusive mutation is sufficient for the baseline. Reentering the same cache during `compute` is unsupported and must be documented. Separate caches may be composed.
-
-A shared concurrent or async cache is optional. If supplied, define duplicate-miss behavior, cancellation, failures, reentrancy, and clearing while work is in flight. Capture the request key before suspension, calculate from that request's snapshot, and prevent cleared work from repopulating the cache under an obsolete generation. Do not add these complexities to the synchronous baseline without a use case.
+Concurrent or `async` caches are outside the baseline. If introduced later, they must separately specify duplicate-in-flight miss coalescing, task cancellation, error propagation, reentrancy, and generation-safe clearing across suspension points.
 
 ## 7. Swift concurrency and ownership
 
-Keep pure key construction and immutable snapshots nonisolated. Add `Sendable` conformances only when stored components satisfy the corresponding transfer requirements.
+Keep pure key construction and immutable snapshots `nonisolated`, and add conditional `Sendable` conformances only where all stored type parameters are `Sendable`.
 
-The baseline must not require every `Hashable` value or every provider to be `Sendable`. An actor-confined UI source is a legitimate client. Conversely, generic cache use must not require the main actor.
+The generic core must not require every `Hashable` dependency, input, result, key path, or closure to be `Sendable`, and must not require `@Sendable` closures or a custom provider protocol to express actor isolation. `KeySource`, `KeyProjection`, `DependencySnapshot`, and `ResultCache` are intentionally not `Sendable`: under Swift 6 region isolation, an instance constructed from actor-isolated key paths or closures stays confined to that actor's isolation region. That allows a `@MainActor` type to own a `ResultCache` or `KeySource` directly while making cross-task transfers fail at compile time. Conversely, non-UI callers can use `DerivedKeys` off the main actor.
 
-UI adapters must access UI state and perform UI measurements on the main actor. They should capture plain dependency values there; those values can cross isolation boundaries only when their types support it.
+UI caches in `DerivedKeysUI` must isolate dependency reads and view measurements to `@MainActor`. Never use `@unchecked Sendable` or isolation-erasing casts to silence compiler diagnostics.
 
-Provider APIs must accurately express their execution isolation. Do not store an actor-isolated closure as an ordinary nonisolated closure or use unchecked `Sendable` conformances to suppress a design mismatch.
+Each mutable cache must have a single concurrency owner (exclusive value ownership for `MemoizationCache` and `ResultCache`, or `@MainActor` isolation for `SizeCache`, `MainActorResultCache`, and `LayoutCache`). Synchronizing a cache does not synchronize the underlying model being read.
 
-Choose one owner for mutable cache storage: exclusive value ownership, an actor, or a documented synchronization wrapper. A lock around the cache does not make the source model safe to read concurrently.
-
-Avoid ownership cycles between an owner, its stored sources, and their closures. Prefer passing explicit input snapshots. If a weak owner capture is used, represent owner disappearance explicitly; do not fabricate a default dependency that might hit an unrelated valid entry.
+Avoid reference cycles between an owner, its caches or sources, and their closures by passing explicit roots or inputs into lookups. If a closure captures an owner `weak`, represent a deallocated owner with a dedicated state that cannot collide with any valid dependency value.
 
 ## 8. Reusable UIKit support and UI measurement examples
 
-The README's primary example uses `DerivedKeysUI.SizeCache` to cache an individual measurement and compose text/button/parent sizes. Its application `DocumentContentView` performs frame-based layout using raw native-fitting leaf caches and bound handles in the parent recipe. The bundle publicly retains the raw leaf caches and parent. Control getters only read controls; initialization and model changes eagerly synchronize content and line limits, and initialization and trait lifecycle changes synchronize fonts. The application still schedules layout and refits the container.
+The README's primary example must use `DerivedKeysUI.SizeCache` to cache a single view measurement and to compose text, button, and container sizes. In the `DocumentContentView` example, frame-based layout uses native-fitting leaf caches and bound child handles inside the parent recipe, with the cache bundle publicly retaining the leaf caches and parent cache. View property getters only read controls; initialization and model setters eagerly synchronize content and line limits, and initialization and trait-change callbacks synchronize fonts. Scheduling layout and refitting the outer container remain the application's responsibility.
 
-Keep the explicit-input, complete-frame `LayoutCache` example as an advanced alternative.
+`LayoutCache`—which takes explicit inputs and stores complete frame layouts—serves as the explicit-input alternative.
 
 ### 8a. Key-path size recipes
 
+#### Products
+
+The package must expose exactly two library products:
+
+- `DerivedKeys`: the standard-library-only generic core.
+- `DerivedKeysUI`: the UI product containing `SizeCache`, `SizeCacheBinding`, `SizeDependencies`, `MainActorResultCache`, `LayoutCache`, `LayoutInputs`, `LayoutKey`, `FittingProposal`, `FittingDimension`, and `FittingProposalError`.
+
+No other library product provides UI support. Keep the tested text, button, and layout examples in a non-product example target (`DerivedKeysUIExample`).
+
 #### Construction and lookup
 
-Add a `DerivedKeysUI` production product without removing existing products. `SizeCache<Root>` is a main-actor reference facade whose initializer binds inferred heterogeneous hashable key paths, optional ordered child descriptions, explicit local capacity, and one synchronous measurement closure. Ordinary lookup is `size(of:toFit:)`. Root needs neither Hashable nor Sendable. Zero selected properties and zero children are valid. No user strings, erased wrappers, custom input structs, operation enums, macros, or builders are required.
+`SizeCache<Root>` is a `@MainActor` reference type. It provides two initializers:
 
-For `Root: UIView`, add a conditional UIKit convenience initializer with heterogeneous hashable key paths and local capacity, no child list, and no measurement closure. A miss calls the passed root's `sizeThatFits(_:)` with the normalized effective proposal. Zero selected properties are valid. Preserve the existing custom-recipe initializer and non-UIKit use. Neither initializer infers complete dependencies, enforces closure purity, or makes mutable Hashable aliases stable. A native-fitting cache must not be called from its measured view's own override, since the resulting same-cache reentry fails the existing precondition; custom recipes remain the escape hatch.
+- **Closure initializer:** binds a parameter pack of heterogeneous `Hashable` key paths on `Root`, an optional ordered list of child dependency descriptions (`children:`), an explicit local `capacity`, an `allowsUndeclaredMeasurements` flag (defaulting to `false`), and one synchronous measurement recipe closure. Works with any `Root` type, including non-UIKit types.
+- **UIKit convenience initializer (`where Root: UIView`):** binds heterogeneous `Hashable` key paths on `Root` and an explicit local `capacity`, with no child list and no recipe closure. On a miss, it calls `root.sizeThatFits(_:)` with the normalized effective proposal. A native-fitting cache must not be called from inside the measured view's own `sizeThatFits(_:)` override, which reenters the same cache and fails a precondition; custom view overrides must use the closure initializer instead.
+
+Lookups use `size(of:toFit:)`. `Root` does not need to conform to `Hashable` or `Sendable`, and zero selected key paths (and zero children on the closure initializer) are valid. Callers do not need string labels, type-erased wrappers, custom input structs, operation enums, macros, or result builders. Neither initializer infers omitted dependencies, enforces recipe purity, or prevents mutation of `Hashable` reference types.
 
 #### Bind child roots
 
-`SizeCache.bound(to:)` creates a final main-actor `SizeCacheBinding<Parent>` subclass of `SizeDependencies<Parent>` for a nonoptional key path. A binding exposes `size(of:toFit:)` and chainable `bound(to:)`, retains the original cache for lookup, and adds no result storage, key identity, or snapshot depth. Its interface is measurement-only: count, capacity, removal, and clearing remain on the original cache. Capturing a binding as a child description retains only dependency readers, not the binding, cache, or measurement closure. Parent calculations capture the bound handles they invoke. Independent paths and chained bindings must read their respective roots independently.
+`SizeCache.bound(to:)` maps a child cache onto a parent root via a nonoptional `KeyPath<Parent, Root>`, returning a `final` `@MainActor` `SizeCacheBinding<Parent>` subclass of `SizeDependencies<Parent>`. It is the only supported way to adapt a child cache to a different root type:
 
-Same-root children pass directly; `child.at(keyPath)` remains a dependency-only mapping of a nonoptional nested root and does not retain its cache. Bound handles combine that description with lookup. Mixed mappings and multiple paths to one child must capture each binding independently. Descriptions are immutable and closed to outside construction. Child edges retain dependency readers, not result storage or measurement recipes; calculation closures retain the handles they call. Composition remains acyclic, with a checked maximum of 64 snapshot nodes per path, including selected value leaves.
+- A binding exposes `size(of:toFit:)` and chainable `bound(to:)`, retains the underlying `SizeCache` for measurement, and adds no separate result storage, key namespace, or snapshot depth.
+- A binding's API is measurement-only; `count`, `capacity`, `removeSize(of:toFit:)`, and `removeAll()` live on the underlying `SizeCache`.
+- Passing a child or binding in `children:` retains only its dependency readers—not the binding, child cache storage, or child recipe. The parent's recipe closure must capture the bound handles or child caches it calls.
+- Same-root children can be passed directly in `children:`. Independent bindings, chained bindings, and multiple bindings to the same underlying child cache read their respective key paths independently.
+- `SizeDependencies` must be closed to external subclassing and expose only `snapshot(of:)` and `maximumDepth`. Composition is acyclic, with a checked maximum of 64 snapshot nodes along any root-to-leaf path (including value leaves).
+
+#### Declared children
+
+Every child `SizeCache` whose measurement contributes to a parent `SizeCache` recipe must be declared in the parent's `children:` list (directly or through a binding):
+
+- In debug builds, calling `size(of:toFit:)` on a `SizeCache` while another `SizeCache` recipe is running must fail an assertion unless the nearest running parent declared that cache—either directly in its own `children:` or transitively through a declared child.
+- If the lookup is made through a `SizeCacheBinding` rooted at the running parent's `Root` type, the binding's key path must also match a declared binding path; if the lookup calls the cache directly or through a binding rooted at a different type, the check verifies cache identity only.
+- A parent whose recipe measures a fixed captured root unreachable by any key path from the parent root can opt out by passing `allowsUndeclaredMeasurements: true`.
+- The UIKit convenience initializer is exempt from the check because `UIView.sizeThatFits(_:)` is opaque to the cache.
+- Release builds must compile out the check and all of its bookkeeping state. `MainActorResultCache`, `ResultCache`, and `LayoutCache` lookups are never checked.
 
 #### Keys and proposals
 
-Keys contain full type-preserving dependency values and ordered recursive structure, the cache's own measurement scope, and both effective proposal dimensions. Snapshot selection never measures, consults result storage, or substitutes child sizes. Every declared child participates even when hidden. Parents select all variable inputs to proposal transformations, branches, and combination; transforms remain solely in calculations, and each invoked child keys its actual proposal.
+Each `SizeCache` key stores the full, type-preserving selected values in their ordered recursive child structure alongside both effective proposal dimensions. Because each cache owns private storage, keys do not need to encode recipe or cache identity. Capturing a dependency snapshot never runs a measurement recipe, reads child result storage, or substitutes child sizes into the parent key; every declared child contributes its selected values to the parent key even when a branch skips measuring that child. Parents must select all variable inputs that affect proposal transforms, branching, or child combination; proposal transforms happen inside the parent recipe, and each measured child keys the proposal passed to it.
 
-Validate proposals without throwing: accept finite nonnegative axes, including greatest finite magnitude, normalize signed zero, and pass the same normalized proposal to measurement without silent rounding. Invalid axes, negative capacity, excessive depth, and same-cache measurement reentry fail descriptive preconditions. Existing generic throwing APIs retain their error behavior.
+`SizeCache` validates proposals without throwing:
+
+- Finite nonnegative dimensions are preserved without rounding, and signed zero (`-0.0`) normalizes to `0.0`.
+- `CGFloat.greatestFiniteMagnitude` and `+infinity` are both treated as unconstrained axes, and the recipe receives `CGFloat.greatestFiniteMagnitude` for either.
+- NaN, `-infinity`, negative dimensions, negative `capacity`, snapshot depth above 64, and same-cache reentry must fail descriptive preconditions. Generic throwing APIs (`FittingProposal(fitting:)`, `FittingDimension(points:)`, `KeySource`) keep their throwing behavior.
 
 #### Storage and ownership
 
-Each facade uses the existing bounded LRU, with its own count, capacity, removal, clearing, and capacity-zero behavior. Parent hits skip their calculation and child result lookups; parent misses may reuse child entries. Child clearing or eviction does not alter semantic dependencies and therefore does not invalidate retained parent results. Clearing a parent clears only its entries. Do not share one mutating value cache across recursive recipes or hold overlapping accesses; guard same-cache reentry before storage access.
+Each `SizeCache` wraps its own bounded LRU storage with independent `count`, `capacity`, `removeSize(of:toFit:)`, `removeAll()`, and capacity-zero behavior:
 
-Keep result-relevant state consistent during synchronous main-actor selection and measurement. Key-path Hashable values still need stable ownership; immutable computed projections are an escape hatch. The configured closure can retain explicit captures, but entries do not implicitly retain lookup roots. The application chooses per-view, screen-injected, or intentional static ownership. It also schedules UIKit layout and assigns the outer frame.
+- A parent hit returns the cached size and skips both the parent recipe and all child lookups; a parent miss runs the recipe and may hit warm child caches.
+- Evicting or clearing a child entry does not change the child's dependency snapshot and therefore never invalidates retained parent entries; clearing a parent clears only the parent's entries.
+- Never share a single mutating value cache across recursive recipes, and check for same-cache reentry before touching underlying storage.
+- Callers must keep size-relevant state consistent across synchronous `@MainActor` dependency reads and recipe execution, and project immutable snapshots for mutable reference properties.
+- A cache retains its recipe closure (and any explicit captures), while cache entries never implicitly retain lookup roots. Applications choose whether to own a cache per view, per screen, or statically, and remain responsible for calling `setNeedsLayout()` and assigning frames.
 
 #### Validation
 
-Validate heterogeneous/nested/zero dependencies, selected/unselected changes, both dimensions and normalization, transformed child proposals, parent-only and child-only changes, parent hits skipping child recency, three levels, all binding forms, root release, recipe scope, collisions, bounded eviction, zero capacity, independent clearing, and existing generic semantics. Compile real UIKit key paths at iOS 16 with Swift 6.4, test diagnostics in isolated processes, and measure snapshot, warm parent, parent miss with warm children, cold composed, and equivalent direct costs using the existing benchmark harness.
+Tests and benchmarks for `SizeCache` must cover:
+
+- Heterogeneous, nested, and empty dependency selections; changes to selected and unselected properties; and hash-collision keys.
+- Both proposal axes and normalization, including `+infinity`, `-0.0`, and parent-transformed child proposals.
+- Parent-only and child-only mutations, parent hits skipping child recency updates, three-level composition, all `bound(to:)` forms, and lookup-root deallocation.
+- Bounded LRU eviction, `capacity: 0`, and independent parent/child clearing.
+- Debug declared-children assertions: declared pass, undeclared assertion failure, `allowsUndeclaredMeasurements: true` pass, and nested parents.
+- Compilation of real UIKit key paths against the iOS 16 Simulator target under Swift 6.4, isolated child-process checks for precondition traps, and benchmark measurements of snapshot capture, warm parent hits, parent misses with warm children, cold composed misses, and direct UIKit fitting.
 
 ### 8b. Explicit layout caching
 
-Provide a supported `DerivedKeysUIKit` library alongside the standard-library-only `DerivedKeys` core. The UIKit product owns validated fitting proposals, a `CGSize` bridge, complete proposal-aware request keys, and a bounded main-actor reference cache with caller-defined result types. The cache passes the captured input, effective proposal, and context into its nonescaping calculation and never retains that calculation. It does not impose a measurement, rounding, clamping, or layout-scheduling policy.
+`DerivedKeysUI` must also provide `FittingProposal`, `FittingDimension`, `FittingProposalError`, `LayoutInputs`, `LayoutKey`, and `LayoutCache`—a bounded `@MainActor` reference cache for caller-defined layout result types:
 
-Use the greatest-finite-magnitude `CGFloat` value as the bridge's reserved unconstrained sentinel; reject NaN, infinity, and negative dimensions. Preserve exact finite bounds. Cache sharing must be explicit through reference ownership, and operation/version separation must survive composed keys.
+- `LayoutCache` keys an `Operation` type, a captured `Hashable` input, the effective `FittingProposal`, and a `Hashable` context (with no `version` parameter). On a miss, it passes the captured input, effective proposal, and context into a nonescaping synchronous calculation closure and never retains that closure. It imposes no text-measurement, rounding, clamping, or layout-scheduling policy.
+- `FittingProposal(fitting:)` maps both `CGFloat.greatestFiniteMagnitude` and `+infinity` to `.unconstrained` and throws `FittingProposalError.invalidDimension` for NaN, `-infinity`, or negative dimensions. `FittingDimension(points:)` rejects both infinities, and `FittingProposal.fittingSize` maps `.unconstrained` back to `CGFloat.greatestFiniteMagnitude` while keeping finite dimensions exact.
+- Multiple views may share a `LayoutCache` by reference, and composed parent keys (`LayoutCache.key(for:proposal:context:)`) preserve operation separation. Reentering a `LayoutCache` during its calculation closure—including reading `count`, removing an entry, or clearing—must fail a descriptive precondition.
 
 ### 8c. Text-component example
 
-Keep example-specific text/font/button policies in a non-product example target. Built-in text measurement helpers and Auto Layout integration are outside the production adapter's scope. Retain the richer child-composition example below as a secondary demonstration.
+Keep example-specific text, font, and button policies in the non-product `DerivedKeysUIExample` target; built-in text-measurement wrappers and Auto Layout helpers are outside the library's scope.
 
-Demonstrate a text component containing content and an optional expansion button.
-
-A representative dependency graph is:
+Demonstrate a composite text component containing body text and an optional expansion button:
 
 ```text
 text measurement
@@ -262,43 +283,35 @@ component measurement
   └─ outer fitting constraints
 ```
 
-Parent keys compose child dependency keys, plus the inputs used only by the parent. The values of child measurements may also be cached independently.
-
-Include every input actually read by the sizing algorithm: potentially width, bounded height, fitting priorities, font metrics, Dynamic Type, locale, layout direction, line limits, paragraph spacing, attachments, padding, and display scale when rounding depends on it. Do not add every trait indiscriminately; document the subset used.
-
-The sizing adapter must include the effective fitting proposal automatically. Passing a width to `compute` while omitting it from the key violates this contract.
-
-Represent unconstrained dimensions explicitly. Reject NaN and invalid negative finite dimensions at the adapter boundary. Translate framework-specific unbounded sentinels into a documented representation. If dimensions are quantized, use the same normalized values for both the key and the actual measurement; rounding the key alone can produce wrong hits.
-
-Hash rendered content or a projection of its metric-affecting properties. A stable document ID alone is insufficient if its text or styling can change. An ID plus revision is valid only if every relevant change updates the revision and the pair uniquely identifies immutable content within the cache's scope.
-
-Action callbacks, analytics identifiers, unrelated URLs, and paint-only colors should be omitted when the sizing algorithm does not consume them. Changing button visibility must affect the component key even when it does not affect the text key.
-
-View reuse must work without view identity in the key: two views with equivalent inputs may share a result, while a reused view with different inputs must request a different key.
-
-Changing a dependency, requesting another size, scheduling layout, and publishing that size to a container are separate actions. The hashing library must not claim to schedule or repair UI layout automatically.
+- Parent keys compose the children's dependency keys with parent-only inputs (`padding`, `spacing`, `showsButton`), while child size caches remain independently reusable.
+- Select every input read by the sizing calculation—such as width, height bounds, font metrics, Dynamic Type category, locale, layout direction, line limits, paragraph spacing, attachments, padding, and display scale (if the recipe rounds to pixels)—without blindly selecting the entire `UITraitCollection`.
+- The sizing cache must key the effective fitting proposal automatically; passing a width into measurement without keying it violates the contract.
+- Represent unconstrained dimensions explicitly, reject NaN, `-infinity`, and negative dimensions at the boundary, and map framework sentinels (`CGFloat.greatestFiniteMagnitude` and `+infinity`) to the canonical unconstrained representation. If a recipe quantizes proposals, both the key and the measurement must use the same quantized value.
+- Key the rendered text (or a projection of its metric-affecting attributes) rather than a bare document ID. An ID plus revision is valid only when every size-relevant mutation increments the revision and the pair uniquely identifies immutable content for the cache's lifetime.
+- Omit action callbacks, analytics IDs, unrelated URLs, and paint-only colors that do not affect geometry. Toggling button visibility must change the component key even though it leaves the text child's key unchanged.
+- View reuse must not depend on view instance identity: two distinct views with equal inputs share cached sizes, and a recycled view reconfigured with new inputs forms a new key.
+- Updating model state, querying a cached size, calling `setNeedsLayout()`, and updating a container remain separate application steps.
 
 ### 8d. Configured arbitrary-result caches
 
-Provide `ResultCache<Input, Value>` in the standard-library-only core and `MainActorResultCache<Input, Value>` in `DerivedKeysUI`. Both bind inferred heterogeneous key paths, a local capacity, and one synchronous nonthrowing calculation at initialization. Lookups use `value(for:)`; removal uses the current input's selected values. Expose `count`, `capacity`, and `removeAll()` without exposing implementation keys.
+Provide `ResultCache<Input, Value>` in `DerivedKeys` and `MainActorResultCache<Input, Value>` in `DerivedKeysUI`:
 
-Only selected values enter keys. Accept nested and zero key paths; use `\.self` explicitly for a complete immutable input. Named Swift tuples carry multiple inputs without introducing contextual cache types or special lookup overloads. Inputs and results need not be Hashable or Sendable; selected values must be Hashable and stable while cached. Capture each path once before lookup, then pass the input to the configured calculation on a miss. Callers keep the input consistent and select every variable value affecting the result.
+- **Initialization and surface:** Both bind a parameter pack of heterogeneous `Hashable` key paths on `Input`, an explicit local `capacity`, and one synchronous nonthrowing recipe closure at initialization. Lookups use `value(for:)`, per-entry removal uses `removeValue(for:)` with the current input's selected values, and both expose `count`, `capacity`, and `removeAll()` without exposing internal key types.
+- **Dependency selection:** Only selected key paths enter the key. Both caches support nested key paths, zero key paths, `\.self` for a whole `Hashable` input, and named tuple inputs (where each relevant tuple element is selected by key path). `Input` and `Value` need not be `Hashable` or `Sendable`, while each selected value must be `Hashable` and stable while cached. Lookups evaluate every key path once before consulting the cache, then pass `Input` to the recipe on a miss.
+- **Isolation and value vs reference semantics:** `ResultCache` is a non-`Sendable` value type whose copies mutate entries independently. It takes ordinary key paths and an ordinary recipe closure with no `@Sendable` or `Sendable` constraint, so Swift 6 region isolation confines an instance built from actor-isolated key paths or closures to that actor (allowing a `@MainActor` type to store a `ResultCache` directly). It relies on exclusive `inout` mutation, and same-cache reentry is unsupported. `MainActorResultCache` is a `@MainActor` reference type for shared main-actor ownership; it enforces a runtime reentry precondition across dependency reads, recipe calculation, `count` inspection, `removeValue(for:)`, and `removeAll()` (while `capacity` remains readable). Calling a distinct cache inside a recipe is allowed.
+- **Storage and retention:** Both use the class-boxed `DependencySnapshot` representation and `MemoizationCache` LRU storage, preserving collision resistance, `Optional.none` hits, `capacity: 0`, LRU recency order, and local clearing. Each cache retains its recipe and key-path readers, and entries retain selected values and results without implicitly retaining the lookup `Input` (though recipe captures, reference-valued selections, and results can retain objects, and copying `ResultCache` does not deep-copy those objects).
+- **Explicit staging:** Multi-stage calculations resolve one cache explicitly and pass its output into the next cache's input. Neither result cache performs automatic pipeline traversal, child-cache composition, `bound(to:)` root mapping, proposal normalization, or view invalidation.
 
-The core facade is a non-Sendable value type with independent entry mutation after copying, a `@Sendable` initializer calculation, and sendable key paths. It requires exclusive mutable access; same-cache reentry remains unsupported. The UI facade is a main-actor reference type accepting main-actor recipes and ordinary key paths. It guards same-cache reentry before dependency capture or calculation, including count inspection, removal, and clearing; immutable capacity remains readable. Distinct cache calls are allowed.
+In `DerivedKeysUIExample`, demonstrate a two-stage pipeline (`ResultBasedRowMeasurements`) that caches `(text, width, font) -> Int` line counts in a `MainActorResultCache` and then caches `PlainTextRowView` sizes in a `SizeCache` keyed by that line count, `font`, `horizontalPadding`, and `verticalPadding` (plus the automatic fitting proposal):
 
-Reuse the existing concrete-value `DependencySnapshot` representation and bounded `MemoizationCache` storage, preserving collision equality, optional nil hits, capacity zero, LRU order, and local clearing. Configured recipes and readers remain retained; entries retain selected values and results without implicitly retaining inputs. Reference-valued selections, results, and captures can retain objects. Copying core caches does not deep-copy those objects.
-
-Keep result stages explicit: resolve one cache, then supply its output to the next. Add no automatic result traversal, pipelines, child declarations, mapping handles, fitting normalization, or layout observation to these facades. Existing size-cache composition and generic throwing APIs retain their contracts.
-
-Demonstrate text, inner width, and font to line count, then count and remaining layout inputs to an actual view measurement, in the application example target. Count actual TextKit line fragments under the same uniform plain-text font, natural line heights, and fixed paragraph settings as the rendered row. The row fills the supplied width and calls its private text view's `sizeThatFits(_:)` for height; do not derive height by multiplying count by a font metric. Require finite positive inner width and reject the unconstrained-width sentinel. Match the text view's empty line and final empty line after a trailing newline. Select font in both stages, per-side padding in the second, and both fitting dimensions automatically through `SizeCache`. Keep text and renderer synchronized, use native model strings, retain independently bounded stages, and avoid capturing the owner.
-
-Explain that equal line counts do not universally imply equal fitted heights or natural widths. Keep the example's uniform rendering policy explicit, compare cached results with actual UIKit fitting, and distinguish those samples from a general guarantee. Rich text or other variable line geometry requires richer intermediate values or the original dependencies. Counting lines requires text layout; make no speedup claim without measuring the complete request. Demonstrate a non-UI configured cache for tokenized search text.
-
-Validate selected and unselected changes, mixed/nested/zero/scalar/tuple inputs, stable projections, collisions, optional nil, eviction, capacity zero, clearing, value-copy independence, shared reference ownership, input release, and main-actor reentry diagnostics. Compile both valid public-import use and rejected isolation/type violations, including UIKit key paths at the iOS 16 minimum. Verify actual text, width, font, and padding invalidation; downstream reuse across distinct strings and views with equal line counts; and agreement with direct fitting for empty, multiline, trailing-newline, and representative multilingual text.
+- Count actual TextKit line fragments under the same uniform plain-text font, natural line heights, and fixed paragraph settings as the rendered `PlainTextRowView`, including an empty string's single line and the trailing empty line after a final newline. Require a finite positive inner width and reject unconstrained width.
+- On a row-size miss, fill the supplied width and call the private text view's `sizeThatFits(_:)` for height rather than multiplying line count by a font metric. Keep the text view synchronized with the model string, select native model strings, bound each stage's capacity independently, and avoid capturing the owning container.
+- Document that equal line counts imply equal height only under this uniform plain-text rendering policy and fixed inner width, not for arbitrary rich text or variable line spacing, and that counting lines runs TextKit layout (so callers must measure the full two-stage request before assuming a speedup). Also demonstrate a non-UI `ResultCache` for tokenized search text.
+- Validate selected and unselected input changes, scalar/nested/zero/tuple key paths, projected value snapshots, hash collisions, `Optional.none` hits, LRU eviction, `capacity: 0`, clearing, `ResultCache` copy independence, `MainActorResultCache` shared ownership, input release, and reentry preconditions; compile positive and negative Swift 6 concurrency fixtures (including iOS 16 UIKit key paths); and test line-count invalidation, cross-string row-size reuse when line counts match, and exact agreement with direct `UITextView` fitting across empty, multiline, trailing-newline, and multilingual strings.
 
 ## 9. Non-UI example
 
-Demonstrate a document exporter with the same key primitives and cache:
+Provide a runnable non-UI example (`DocumentExportExample`) that uses the generic key types and `MemoizationCache`:
 
 ```text
 export key
@@ -309,36 +322,40 @@ export key
   └─ exporter algorithm version, if needed
 ```
 
-Exclude selection state, scrolling position, view dimensions, and share callbacks.
-
-Changing an export option must recompute the output. Changing an unrelated UI property must reuse it. This example must compile in the generic package without UIKit, AppKit, SwiftUI, or CoreGraphics.
+- Exclude UI-only state such as selection, scroll offset, view size, and share callbacks.
+- Changing an export option must miss and recompute; changing an unselected UI property must hit and reuse the cached output.
+- The target must build and run using only `DerivedKeys` and the Swift standard library, without importing UIKit, AppKit, SwiftUI, or CoreGraphics.
 
 ## 10. Performance requirements
 
 ### Key and storage costs
 
-Measure key work separately from the expensive computation being cached.
+Measure key construction, hashing, and lookup overhead separately from the cached computation itself:
 
-- Avoid allocations on repeated lookups where concrete value keys suffice.
-- Construct dependency lists in one pass. Repeated immutable appends must not impose quadratic construction work on the recommended bulk-building path.
-- Do not reread or rehash large immutable content unnecessarily. Precompute reusable projections at content creation or controlled mutation boundaries where profiling supports it.
-- A revision may replace a large projection only with an explicit identity, mutation-coverage, and non-reuse contract. Never use an arbitrary short hash as a collision-free revision.
-- Request-local memoization may eliminate repeated visits to shared sources.
-- Use iterative evaluation or a documented supported depth when graphs can be deeply nested.
-- Bound cache entries and account for retained key data as well as results. Avoid retaining large parent objects through otherwise small projections.
-- Do not claim constant-time lookup overall: projection, hashing, and equality have costs proportional to the inspected data. Dictionary indexing and LRU bookkeeping should be expected amortized constant time apart from those costs.
-- Start with standard-library facilities. Add macros, custom storage, or specialized graph machinery only when a measured need justifies them.
-- Preserve each selected value's concrete hashing and equality through internal erasure, including collections. Direct snapshots and source-produced snapshots must use the same representation without requiring caller wrappers.
+- Avoid heap allocations on repeated lookups when static generic key types (`RequestKey`, `KeyPair`, `OriginalKey`, `DerivedKey`) suffice.
+- Build composite `KeySource` child lists in linear time via the bulk initializer (`init(_:children:)`) so callers do not pay quadratic copying costs from repeated `appending(_:)` calls.
+- Avoid rereading or rehashing large immutable payloads unnecessarily; callers can precompute projections at mutation boundaries or use an ID-and-revision pair when backed by an explicit mutation-coverage and non-reuse contract (never a truncated integer hash).
+- Use request-local memoization in `KeySource.snapshot(for:)` so shared source nodes run their providers only once per snapshot, and enforce the 64-node maximum depth.
+- Bound cache entry counts (`capacity`) and account for memory retained by both keys and results, avoiding accidental retention of large model owners inside small projections.
+- Document that lookup time includes projection, hashing, and key equality proportional to the selected data, while hash-table lookup and LRU list updates take expected amortized constant time beyond those key costs.
+- Use standard-library collections and generics without macros or external dependencies unless benchmark evidence justifies added machinery.
+- Erase leaf values in `DependencySnapshot` with a private generic class box that preserves the concrete value type's identity, `==`, and `hash(into:)`—never `AnyHashable`—and share that representation across direct snapshots, `KeySource`, `ResultCache`, and `DerivedKeysUI` without requiring caller wrappers.
+- Mark the core's hot generic entry points (`MemoizationCache`, typed keys, `KeyProjection.key`, `DependencySnapshot.init(value:)`, and `ResultCache` lookup and removal) `@inlinable` with explicit typed-key `==` and `hash(into:)` implementations so client modules specialize them. Any change to snapshot representation or inlining requires both correctness tests and benchmark evidence.
 
 ### Benchmark coverage
 
-Benchmark release builds for direct computation, cold misses, warm hits, changing relevant inputs, changing irrelevant inputs, large payloads, shared dependencies, and eviction. Report compiler, hardware, workload, key cost, computation count, allocations where measurable, and retained memory. Do not set an unsupported universal speedup target.
+Provide reproducible Release benchmarks covering direct computation, cold misses, warm hits, relevant-input mutations, irrelevant-input mutations, small and large payloads, shared dependency nodes, and bounded LRU eviction. Record the compiler, host hardware, OS/SDK versions, workload parameters, key overhead, calculation counts, and timing distributions, without claiming a universal speedup ratio.
 
-Actual UIKit fitting is the primary sizing evidence: compare equivalent direct and cached `UILabel`, `UITextView`, and document child/parent measurements on the main actor. Preserve UIKit's own warm behavior, include shared results across view instances, parent-only changes, transformed widths, content/typography changes, and bounded mixed traces with observed hits, misses, and eviction. Separate measurement-only timing from configuration work, validate results outside timing, and report repeated-trial variability. Identify Simulator results separately from physical-device results. Retain synthetic key and storage measurements as secondary diagnostics; fewer measurement calls alone do not establish a performance benefit.
+For UI sizing, real `@MainActor` UIKit fitting (`UILabel`, `UITextView`, `UIButton`, and composed `DocumentContentView`) is the primary benchmark evidence:
+
+- Compare cached sizing against an equivalent direct UIKit baseline that preserves UIKit's own warmed internal layout state.
+- Cover warm unchanged views, equivalent view pools, warm composed parents, parent-only spacing changes, outer width changes, content/typography changes, and bounded mixed traces that exercise hits, misses, and eviction.
+- Separate measurement-only scenarios from scenarios that include view configuration inside the timed loop, verify output equality and hit/miss counts outside timing, and report medians and trial variability across repeated runs.
+- Report iOS Simulator and physical-device timings separately, and keep synthetic macOS benchmarks (`DerivedKeysBenchmarks`) as secondary component diagnostics—fewer `sizeThatFits(_:)` calls alone do not establish a wall-clock speedup.
 
 ## 11. Acceptance criteria and deliverables
 
-Implement deterministic tests covering:
+The test suite must deterministically verify every scenario below:
 
 | Scenario | Required outcome |
 | --- | --- |
@@ -360,18 +377,17 @@ Implement deterministic tests covering:
 | Owner and cache are released | No unintended retention from providers or entries |
 | Non-UI example | Uses the same generic core without UI dependencies |
 
-Do not assert that unequal keys always have different integer hashes. Test semantic equality and collision handling instead.
+Never test inequality by asserting `lhs.hashValue != rhs.hashValue`; test semantic `==` and deliberate hash collisions instead.
 
-For concurrency-related APIs, add positive compilation fixtures for supported usage and negative fixtures for prohibited isolation crossings under the same compiler settings. Run deterministic race/reentrancy tests only for concurrency features actually shipped.
+Include positive compilation fixtures for valid Swift 6 concurrency usage (including a `@MainActor` type owning a `ResultCache`) and negative fixtures for rejected cross-task transfers (such as sending that `ResultCache` to a detached task) compiled under the package's exact Swift 6 and warnings-as-errors flags.
 
-Deliver:
+Deliverables:
 
-- A Swift package containing the generic key/source abstractions.
-- The bounded generic reference cache.
-- Supported `DerivedKeysUI` sizing and `DerivedKeysUIKit` explicit-layout products, with tested UIKit examples and recursive composition.
-- A runnable non-UI example.
-- API documentation covering equality, dependency completeness, evaluation timing, isolation, lifetimes, and complexity.
-- Automated tests and reproducible release benchmarks.
-- Exact build/test commands, results, and any unsupported configurations.
+- The `DerivedKeys` Swift package module with typed keys, `KeyProjection`, `KeySource`, `DependencySnapshot`, `MemoizationCache`, and `ResultCache`.
+- The `DerivedKeysUI` product with `SizeCache`, `SizeCacheBinding`, `SizeDependencies`, `MainActorResultCache`, `LayoutCache`, and `FittingProposal`, plus the tested UIKit examples in `DerivedKeysUIExample`.
+- The runnable `DocumentExportExample` target.
+- Public DocC and Markdown documentation covering equality, dependency completeness, evaluation timing, actor isolation, retention, and complexity.
+- Automated unit, precondition, concurrency, Simulator, and DocC validation scripts, plus reproducible Release benchmarks.
+- Documented local check commands, benchmark results, and any known environment constraints (such as tool-hosted XCTest requiring an app host on physical iOS devices).
 
-The implementation is complete when these contracts are implemented and the applicable checks pass. The implementing agent must report gaps explicitly rather than treating the specification itself as validation.
+The package meets this specification when all requirements above are implemented and the full validation suite passes; any unverified environment or gap must be reported explicitly.

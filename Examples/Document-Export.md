@@ -1,6 +1,6 @@
 # Reusing an export after a UI change
 
-This example uses the generic `DerivedKeys` API to reuse a plain-text export after selection changes. The exporter retains its cache across requests and captures the content and format once per request. It calculates from that same snapshot. Selection is absent from the key because the exporter never reads it.
+This example uses the lower-level `DerivedKeys` APIs to reuse a plain-text export when UI selection changes. `Exporter` retains its `MemoizationCache` across requests, captures the document text and export format once per call, and runs its calculation from that captured `ExportInput`. Because the exporter never reads `isSelected`, selection state is omitted from the key.
 
 ```swift
 import DerivedKeys
@@ -44,4 +44,4 @@ let capitals = exporter.export(document, uppercase: true) // Different key.
 assert(first == second && capitals == "HELLO")
 ```
 
-Run `swift run DocumentExportExample` from the repository for the fuller ordered-paragraph exporter. It projects document content, format, and export options while ignoring selection and scrolling. The [generic API guide](Generic-Core.md) covers dependency selection and cache ownership beyond this example.
+Run `swift run DocumentExportExample` from the repository root to execute the fuller multi-paragraph exporter, which projects document content, format, and export options while ignoring selection and scroll position. See the [generic API guide](Generic-Core.md) for more on dependency selection and cache ownership.

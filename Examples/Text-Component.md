@@ -1,18 +1,12 @@
 # Measuring a text component
 
-`DerivedKeysUIExample` measures a vertical stack of plain text and an optional
-expansion button. It is a non-product example target that runs inside this
-repository and demonstrates explicit composition of child dependency keys.
+`DerivedKeysUIExample` includes `TextComponentMeasurer`, which measures a vertical stack of plain text and an optional expansion button. It is a non-product example target inside this repository that demonstrates how to compose child `RequestKey` values explicitly rather than using `SizeCache` key paths.
 
-For ordinary view sizing in an app, start with the [size-cache guide](Size-Caches.md)
-and the `DerivedKeysUI` product. This secondary example demonstrates explicit-input
-composition; the [UIKit guide](UI-Measurement.md) explains that alternative using
-the supported `DerivedKeysUIKit` product. The generic `DerivedKeys` library has no
-UIKit dependency; UIKit declarations and tests use `#if canImport(UIKit)`.
+For ordinary view sizing in an app, start with the [size-cache guide](Size-Caches.md). For explicit-input layout caching with `LayoutCache` from `DerivedKeysUI`, see the [UIKit guide](UI-Measurement.md). The generic `DerivedKeys` library has no UIKit dependency; UIKit declarations and tests in the example target are gated with `#if canImport(UIKit)`.
 
 ```swift
+import DerivedKeysUI
 import DerivedKeysUIExample
-import DerivedKeysUIKit
 
 @MainActor
 func example() throws {
@@ -36,67 +30,29 @@ func example() throws {
 }
 ```
 
-Keep the measurer alive across requests to retain its caches. Capture a coherent
-snapshot in the code that owns model mutation. The main-actor API does not suspend
-and uses the same snapshot for both key formation and calculation. It does not
-retain a model, callback, provider, or view.
+Retain one `TextComponentMeasurer` across requests so its internal caches stay populated. Capture a coherent input snapshot inside the code that owns model mutations; the main-actor measurement API runs synchronously without suspending and uses that same snapshot for both key formation and calculation. It never retains a model, callback, provider closure, or view.
 
 ## Inputs consumed by this algorithm
 
-The text child key contains rendered plain text, a concrete named font and point
-size, line count, wrapping/truncation policy, effective inner width and height,
-and display scale. `MeasurementFont` resolves the name on the main actor; resolve
-Dynamic Type to a concrete point size before constructing it. The example does
-not accept arbitrary font descriptors, attributed text, paragraph styles,
-attachments, images, or fitting priorities. It does not perform locale-dependent
-formatting. Labels use forced left-to-right semantic direction and UIKit's
-plain-text shaping and `sizeThatFits`; the font environment is process-local.
+The measurer builds three distinct keys—each with its own nominal `Operation` type and independently bounded LRU cache:
 
-The button child key contains its title, font, style, effective inner bounds, and
-display scale. Its single-line title truncates at the tail. `plain` adds no
-content insets; `padded` adds 12 points on each horizontal side and 6 on each
-vertical side. Here, style controls these measurements. Measurement does not use
-UIButton's ambient configuration or a paint style.
-
-The parent key contains the complete text child key, the optional button child
-key, padding, visible-button spacing, outer proposal, and context. Hidden buttons
-have no child key, so their title, style, font, and callback cannot invalidate the
-parent. Spacing is normalized to zero when no button exists. Parent keys compose
-child dependency keys, rather than sizes or hashes. The text, button, and parent
-operations have separate nominal namespaces and independently bounded LRU caches.
+- **Text child key:** captures the rendered plain-text string, a concrete font name and point size (`MeasurementFont` resolves the font name on the main actor, so resolve Dynamic Type to a concrete point size before constructing it), maximum line count, wrapping or truncation mode, effective inner width and height, and display scale. Measurement configures a `UILabel` with forced left-to-right semantic direction and calls UIKit's plain-text `sizeThatFits(_:)` in the current process-local font environment. The example intentionally excludes arbitrary font descriptors, attributed strings, paragraph styles, attachments, images, fitting priorities, and locale-dependent formatting.
+- **Button child key:** captures the single-line title (which truncates at the tail), font, button style, effective inner bounds, and display scale. Here `style` is a layout input rather than a paint style: `.plain` adds no content insets, whereas `.padded` adds 12 points horizontally and 6 points vertically on each side. Measurement does not read `UIButton`'s ambient configuration or appearance state.
+- **Parent key:** composes the complete text child key, the optional button child key, outer padding, visible-button spacing, the outer fitting proposal, and the `MeasurementContext`. Parent keys embed the full child dependency keys rather than child sizes or integer hashes. When the button is `nil`, the parent key has no button child key and normalizes `spacing` to zero, so hidden-button properties (title, style, font, or action callbacks) cannot invalidate the parent entry.
 
 ## Layout policy
 
-Both children fit within the outer proposal minus padding. The parent stacks
-their independently measured sizes, adds visible-button spacing and padding,
-rounds upward to the display pixel grid, and clamps to the outer width and height.
-A bounded height can therefore clip the stack; this example does not allocate
-remaining height between the children. Child results also round and clamp. A
-non-pixel-aligned bound wins over pixel rounding. Extreme finite products avoid
-overflow in rounding by leaving that dimension unrounded.
+Both children are measured against the outer proposal inset by `padding`. The parent stacks their independently measured sizes vertically, adds `padding` and visible-button `spacing`, rounds dimensions upward to the display pixel grid, and clamps to the outer proposed width and height. Because this example does not partition remaining height between the text and button, a finite height bound can clip the stacked total.
+
+Child measurements also round upward to the pixel grid and clamp to their inner proposal bounds. When a finite proposal bound is not pixel-aligned, clamping wins over upward pixel rounding. If multiplying a finite dimension by the display scale would overflow, that dimension is left unrounded rather than overflowing.
 
 ## Validation and reuse
 
-`FittingDimension(points:)` requires finite nonnegative values and throws
-`FittingProposalError.invalidDimension` for NaN, infinity, or negative numbers.
-Use `.unconstrained` for an unbounded axis; the UIKit adapter converts it to
-`CGFloat.greatestFiniteMagnitude` only when calling `sizeThatFits(_:)`. It never
-rounds proposal bounds or interprets raw infinity as a valid bound.
+All inputs are validated at construction time and stored in private immutable fields with no `Codable` or raw-value bypass:
 
-Insets and spacing must be finite and nonnegative, with finite horizontal and
-vertical inset sums. Display scale must be finite and positive, named fonts must
-resolve at a finite positive size, and line count must be nonnegative. These
-validated values use private immutable storage with no decoding or raw-value
-construction path.
+- **Proposals:** `FittingDimension(points:)` requires a finite, nonnegative value and throws `FittingProposalError.invalidDimension` for NaN, infinity, or negative numbers. Use `.unconstrained` for an unbounded axis; the UIKit adapter converts `.unconstrained` to `CGFloat.greatestFiniteMagnitude` only when calling `sizeThatFits(_:)` and never rounds proposal bounds. When bridging from a `CGSize`, `FittingProposal(fitting:)` treats positive infinity the same as `CGFloat.greatestFiniteMagnitude`.
+- **Geometry and typography:** Insets and spacing must be finite and nonnegative, and the horizontal (`left + right`) and vertical (`top + bottom`) inset sums must also be finite. Display scale must be finite and positive, named fonts must resolve on the system at a finite positive point size, and line count must be nonnegative.
 
-Project actual content into the key, even when an entity ID stays unchanged.
-Paint-only colors, analytics identifiers, unrelated URLs, actions, and view
-identity are excluded because the sizing algorithm does not read them. Two
-different views with equal snapshots can share sizes. A reused view with changed
-content supplies a new snapshot. A→B→A inputs recover the original key and may
-reuse its retained entry.
+Project actual content into the input structs even when an entity ID has not changed. Paint-only colors, analytics identifiers, unrelated URLs, action handlers, and view identity are omitted because the sizing calculation never reads them. Two views with equal snapshots share cached sizes, a reused view with new content supplies a new snapshot, and changing inputs from A to B and back to A reproduces the original key and hits its entry if still retained.
 
-Changing a dependency, asking for a size, scheduling layout, and publishing that
-size are separate application actions. These keys do not trigger layout or
-observe model changes. The calculation counters demonstrate reuse; they are
-diagnostics rather than dependencies.
+Updating a dependency, requesting a size, scheduling layout, and publishing that size to a container remain separate application steps; these types never observe models or trigger layout automatically. The calculation counters on `TextComponentMeasurer` exist to verify cache reuse in tests and are not part of any key.

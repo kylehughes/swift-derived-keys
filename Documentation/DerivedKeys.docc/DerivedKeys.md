@@ -4,15 +4,15 @@ Capture the dependencies of a calculation as an immutable, hashable request.
 
 ## Overview
 
-A model can change without changing the result of every calculation that consumes it. A view layout depends on content, typography, and fitting bounds even when the entity's ID stays the same; a paint-only color change can leave its geometry unchanged. An export depends on document content and export options while selection and scroll position can be irrelevant.
+A model often changes without affecting every calculation that reads it. A view's geometry depends on text, typography, and fitting bounds even when the model's ID is unchanged, while a paint-only color change leaves geometry alone. A document export depends on content and format options, not selection state or scroll offset.
 
-Define a key for the inputs a particular calculation reads, independently of the model's general-purpose `Equatable` or `Hashable` conformance. Capture a consistent input state, build a request key from its relevant properties, and compute the result from that same captured input on a cache miss. Equal keys must imply interchangeable results. The library compares only what you select; it cannot determine whether you included every relevant input.
+Instead of altering a model's general-purpose `Equatable` or `Hashable` conformance, project only the inputs that a specific calculation reads. Capture a consistent input state, build a key from its relevant values, and run the calculation from that same captured input on a miss. Equal keys must imply interchangeable results: the library compares only what you select and cannot verify whether you omitted an input the calculation reads.
 
-Pass those keys to ``MemoizationCache`` to reuse results within a fixed capacity, or use the key-building APIs independently with your own storage.
+Use ``ResultCache`` to bind key paths and a recipe directly, pass explicit keys to ``MemoizationCache`` for bounded LRU reuse, or use the key types with your own storage.
 
 ## Reuse an export
 
-Retain a cache across requests, and capture the values the exporter reads. This exporter selects text and the uppercase option; changing selection leaves its request key equal.
+Retain the cache across requests and capture the values the exporter reads. Here the exporter selects `text` and `uppercase`, so toggling `isSelected` produces the same request key and hits the cache:
 
 ```swift
 import DerivedKeys
@@ -56,15 +56,15 @@ let capitals = exporter.export(document, uppercase: true) // Different key.
 assert(first == second && capitals == "HELLO")
 ```
 
-The cache hit skips the calculation closure. The uppercase request has different dependencies and calculates a separate result. Keep each export's key and calculation based on the same captured input.
+A hit returns the stored output without running the closure. Passing `uppercase: true` changes the dependencies and computes a separate entry. Always build the key and compute the miss result from the same captured `input`.
 
 ## Choose the API for your dependencies
 
-Start with <doc:DependencyDesign> to choose complete dependencies. Use ``ResultCache`` to bind key paths and a nonthrowing calculation once, then call `value(for:)` with each input. Named tuple inputs combine values without a custom request type; select every relevant tuple field explicitly. The cache is a value type, and copied caches mutate their entries independently.
+Read <doc:DependencyDesign> first to decide which inputs belong in a key. Then pick the surface that matches your calculation:
 
-Use ``RequestKey`` with a small `Hashable` struct for fixed schemas. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled typed composition. ``KeySource`` supports heterogeneous runtime graphs, and ``MemoizationCache`` stores results for bounded synchronous reuse, including throwing calculations.
-
-For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selected key paths on the main actor, keys the fitting proposal automatically, and composes child caches. The same module provides `MainActorResultCache` for main-actor calculations with arbitrary result types. To cache custom layout results, such as fitted sizes alongside child frames, use `LayoutCache` in `DerivedKeysUIKit` with explicit inputs and an automatic fitting-proposal key. `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
+- **Key-path recipe caching:** ``ResultCache`` binds selected key paths and a nonthrowing recipe once, then looks up results with `value(for:)`. Pass a named tuple when a calculation takes several inputs, and select every relevant tuple field. `ResultCache` is a value type whose copies mutate independently; it takes ordinary key paths and closures with no `Sendable` requirement, so a `@MainActor` type can own one directly.
+- **Explicit request keys and throwing calculations:** Pair ``RequestKey`` (or ``KeyProjection``) and a small `Hashable` dependency struct with ``MemoizationCache`` when you want explicit keys or throwing calculations. ``OriginalKey``, ``DerivedKey``, and ``KeyPair`` add labeled, static composition, while ``KeySource`` and ``DependencySnapshot`` build heterogeneous runtime dependency graphs.
+- **Main-actor UI sizing and layout:** Use the `DerivedKeysUI` module for UIKit. It provides `SizeCache` (which reads key paths on the main actor, keys the fitting proposal automatically, and composes child caches), `MainActorResultCache` (for shared main-actor result caches), and `LayoutCache` (for complete layout outputs such as fitted sizes with child frames). `DerivedKeys` itself depends only on the Swift standard library and has no main-actor requirement.
 
 ## Topics
 
@@ -83,7 +83,6 @@ For UIKit view sizing, `DerivedKeysUI` provides `SizeCache`, which reads selecte
 ### Evaluate runtime sources
 
 - ``KeySource``
-- ``KeyValueProvider``
 - ``DependencySnapshot``
 
 ### Reuse a result

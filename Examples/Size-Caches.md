@@ -1,12 +1,14 @@
 # Composing size caches
 
-Use `DerivedKeysUI.SizeCache` to retain measurements selected by key-path dependencies. For a UIKit leaf, omit the closure to call the passed view's `sizeThatFits(_:)` on a miss. A parent declaring `children:` always supplies a calculation closure, as does any custom recipe.
+`SizeCache` caches `CGSize` measurements keyed by selected key paths and the fitting proposal. For a `UIView` leaf, the UIKit initializer calls the root view's `sizeThatFits(_:)` on a miss. When you compose `children:` or need custom measurement logic, you supply a recipe closure.
 
-Start with the [README](../README.md) for one measurement and a composed text/button layout. This guide covers mapped children, ownership, and dependency choices. The [complete application example](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a controller that assigns frames. These are application types; the library does not require them.
+Start with the [README](../README.md) for a single-view measurement and a two-child layout. This guide covers child bindings, child declarations, multi-level nesting, proposal transforms, ownership, and model-backed text. The [complete application example](../Sources/DerivedKeysUIExample/DocumentContentView.swift) defines `DocumentContentView`, the screen-owned `DocumentSizeCaches` bundle, and a view controller that assigns frames—all ordinary application types, with no required base class. For the rules every cache shares, see the [cache contract](../Documentation/DerivedKeysUI.docc/CacheContract.md).
 
 ## Map a child root
 
-A child can measure a nested root. Bind its cache to a path in the parent, then use that handle for both dependency capture and measurement. Here `titleSizing` and `subtitleSizing` are `SizeCacheBinding<PairView>` handles that share the original label cache. Each accepts the parent pair and follows its path to the corresponding label. Every label sharing this cache must use the same unselected measurement settings, fixed for the cache's lifetime:
+When a child cache measures a subview or nested value, call `bound(to:)` with a key path from the parent root to the child root. Pass the resulting binding in `children:` and call it inside the parent's recipe; `bound(to:)` is the only way to map a child cache onto a parent root.
+
+Here `titleSizing` and `subtitleSizing` are `SizeCacheBinding<PairView>` bindings backed by a single `SizeCache<UILabel>`. Each binding takes the `PairView` root and follows its key path to read dependencies and measure the corresponding label. Because both labels share one cache, any unselected label settings that affect size must match across both.
 
 ```swift
 import DerivedKeysUI
@@ -41,17 +43,23 @@ func makePairSizes(titleSizes: SizeCache<UILabel>) -> SizeCache<PairView> {
 }
 ```
 
-A title and subtitle with different selected values produce separate child requests through the same cache. Each binding reads its own path, so the title and subtitle are captured separately. Equal child inputs and proposals may intentionally reuse a result. Same-root children can appear alongside mapped children in one initializer.
+If the title and subtitle have different selected values, they produce separate entries in `titleSizes`; if their selected values and proposals match, the second lookup hits the entry from the first. You can mix same-root children and bindings in the same `children:` list.
 
-`bound(to:)` returns a main-actor `SizeCacheBinding<Parent>`, which you can chain with further `bound(to:)` calls for deeper hierarchies. A binding retains the original cache and shares its entries, capacity, and LRU order without adding storage, key identity, or snapshot depth. Inspect `count` or clear entries on the original `SizeCache`; bindings have no storage-management API. When assigning a binding to a local variable, write out the root type in the key path, such as `\PairView.title`, so Swift can infer `Parent`.
+`bound(to:)` returns a main-actor `SizeCacheBinding<Parent>`, which you can chain with further `bound(to:)` calls for deeper hierarchies. A binding shares the original cache's entries, capacity, and recency order, and adds no storage, key identity, or snapshot depth. Inspect `count` or clear entries on the original `SizeCache`. When assigning a binding to a local variable, include the root type in the key path (such as `\PairView.title`) so Swift can infer `Parent`.
 
-Bindings and mappings require nonoptional root paths; arbitrary mapping closures and conditional child declarations are not supported. Handle conditions and any required stable projections in the parent's closure and dependencies.
+Bindings require nonoptional key paths. Arbitrary mapping closures and conditional child declarations are not supported; express conditions and stable projections in the parent's recipe and selected key paths.
 
-`SizeCache` cannot discover caches called inside a closure. List the children that determine the parent result in `children:` and capture those same handles in the closure. Every declared child contributes to the snapshot on each lookup, even when a branch skips measuring it.
+## Declare the children you measure
+
+`SizeCache` cannot see which caches a recipe calls at runtime. List every child cache that can affect the parent's size in `children:`, and capture those same caches or bindings in the recipe. Every declared child contributes its selected values to the parent's snapshot on each lookup, even when a branch in the recipe skips measuring it.
+
+A parent that measured through an undeclared cache would keep returning its own cached entries when only that child's inputs changed. Debug builds catch this: calling `size(of:toFit:)` while another `SizeCache` recipe is running fails an assertion unless the nearest running parent declared that cache in `children:`, either directly or through a child that declares it. A lookup through a binding rooted at the parent must also match a declared path—declaring a title binding and measuring a subtitle binding of the same cache fails—whereas a direct cache call has no comparable path and is checked by cache identity only. Release builds omit this check, and lookups on `MainActorResultCache`, `LayoutCache`, and `ResultCache` are never checked.
+
+If a parent's recipe measures a fixed captured root that no key path from the parent root can reach, pass `allowsUndeclaredMeasurements: true` to that parent's initializer and include the relevant inputs in the parent's own selection. The native UIKit leaf initializer needs no opt-out because the view's `sizeThatFits(_:)` is opaque to the cache. See [declare children](../Documentation/DerivedKeysUI.docc/CacheContract.md#declare-children) for the complete rule.
 
 ## Nest a composed layout
 
-A composed cache can itself be a child. Suppose an application's `DocumentCardView` holds a `headerLabel: UILabel`, a `contentView: DocumentContentView`, and a `spacing: CGFloat` gap. The card adds the header above the complete document. Its spacing is finite and nonnegative; each child follows its recipe's fixed-configuration contract.
+A composed `SizeCache` can itself be a child of a higher-level `SizeCache`. Suppose an application's `DocumentCardView` places a `headerLabel: UILabel` above a `contentView: DocumentContentView` with a finite, nonnegative `spacing: CGFloat` gap:
 
 ```swift
 @MainActor
@@ -79,7 +87,7 @@ func makeCardSizes(
 }
 ```
 
-The screen constructs and retains the header, document, and card caches once. In its main-actor setup, `documentCaches` is a `DocumentSizeCaches` bundle and `card` is the view to measure:
+Construct and retain the header, document, and card caches once on the main actor. Here `documentCaches` is a `DocumentSizeCaches` bundle and `card` is the view to measure:
 
 ```swift
 let headerSizes = makeTitleSizes()
@@ -89,39 +97,33 @@ let cardSize = cardSizes.size(
 )
 ```
 
-These are three levels: card, document, and document controls. A card hit skips the entire calculation. Changing only the card's spacing changes its height while reusing the header and document results. Changing document text selects new document and card entries while leaving the header reusable. The card expects an actual available width and computes natural height, just like the document. Frame assignment remains the application's responsibility.
+This forms three levels: card, document, and leaf controls. A hit on `cardSizes` skips the entire calculation. Changing only `card.spacing` misses on the card while hitting the cached header and document sizes. Editing the document text misses on the document and the card while reusing the header size. Like the document layout, the card requires a finite proposed width and returns natural height.
 
-The [compiler fixture](../Fixtures/iOS/READMEExamples.swift) includes the minimal card root and the complete calls. The root shown there is measurement scaffolding, not a package-owned view or a complete card layout implementation.
+The [compiler fixture](../Fixtures/iOS/READMEExamples.swift) defines the minimal `DocumentCardView` root and these calls as test scaffolding rather than a package-owned view.
 
 ## Keep proposals with their calculations
 
-A parent keys its own proposal alongside the dependency values captured from itself and its children. Transformed child proposals do not enter the parent key; each child keys the proposal it actually receives at lookup. Select padding, orientation, visibility, and any other values that affect how the parent transforms proposals or combines sizes. You do not need to declare the proposal math outside the measurement closure.
+A parent keys its outer proposal alongside the values selected from itself and its children. Transformed child proposals do not enter the parent key; instead, each child keys the proposal it receives when the parent recipe calls it. Select padding, axis, visibility, and any other properties that affect how the parent transforms proposals or combines child sizes, and keep the proposal math inside the recipe.
 
-The document example measures inner content at `max(0, outerWidth - 2 * padding)` and unconstrained height. Changing spacing changes only the parent key. Changing padding also changes the child's actual width. Changing the outer height changes the parent request even though this example chooses natural height; its unchanged child proposals can still hit.
+In the document example, the recipe measures children at `max(0, outerWidth - 2 * padding)` and unconstrained height. Changing `spacing` changes only the parent key. Changing `padding` changes both the parent key and the inner width passed to the children. Changing the outer proposed height produces a new parent key even though this layout returns natural height, while the children still receive the same unconstrained height proposal and hit their caches.
 
-Both proposal axes must be finite and nonnegative. `CGFloat.greatestFiniteMagnitude` denotes an unconstrained axis; infinity is rejected. Signed zero becomes positive zero in both key and callback proposal. Dimensions are not quantized. The recipe controls result sizing, including any rounding or clamping.
+See [fitting proposals](../Documentation/DerivedKeysUI.docc/CacheContract.md#fitting-proposals) for valid proposal values and how infinity and signed zero are handled.
 
 ## Keep ownership explicit
 
-The document screen owns a `DocumentSizeCaches` bundle and injects it into reusable views. The bundle's initializer retains the `UITextView` and `UIButton` caches as public properties and creates local bound handles for the parent. The parent declares and captures those same bindings. Its closure captures the children, not the bundle or a view.
+In the document example, the screen owns a `DocumentSizeCaches` bundle and injects it into reusable views. The bundle exposes the leaf `UITextView` and `UIButton` caches as public properties and creates local bindings for the parent cache; the parent recipe captures only those bindings, not the bundle or any view. Storing a cache on an individual view or in an intentionally shared static property works just as well—the library installs no global storage.
 
-Each cache has its own capacity and LRU order. Choose a capacity for the distinct content, widths, and other selected states likely to be revisited; capacity bounds entries, not the bytes retained by their snapshots and results. A view-owned cache and an intentionally static cache are equally valid; the package installs no global storage.
+Each cache manages its own capacity and LRU order, so size each capacity for the distinct states you expect that cache to revisit. Parent and child caches evict and clear entries independently; see [capacity, eviction, and clearing](../Documentation/DerivedKeysUI.docc/CacheContract.md#capacity-eviction-and-clearing) and [what a cache retains](../Documentation/DerivedKeysUI.docc/CacheContract.md#what-a-cache-retains).
 
-Passing a child in `children:` captures only its dependency readers, without retaining the cache, binding, entries, or measurement closure. The parent closure must capture any child handles it calls; a `SizeCacheBinding` keeps the original cache alive for those measurements.
+The document example updates its controls before measurement: text and line limits at initialization and on model updates, and category-only fonts at initialization and on trait updates. Its control getters never mutate the controls. Updating content, calling `setNeedsLayout()`, asking for a fitted size, and assigning the outer frame remain separate application steps owned by the view and its controller.
 
-Use `titleSizes.at(\PairView.title)` when you only need a dependency description and plan to call `titleSizes.size(of: pair.title, toFit: proposal)` directly in the closure. The descriptor retains only dependency readers; the closure retains the cache it measures through.
+## Select values the cache can trust
 
-Cached entries contain captured values and `CGSize` results; the root supplied to `size(of:toFit:)` is not implicitly retained. Explicit user captures or reference-valued dependencies can still retain a root or owner.
-
-`count` and `capacity` describe one cache. `removeSize(of:toFit:)` removes its entry for the current dependencies and normalized proposal; `removeAll()` clears only its storage. Parent and child results have independent eviction and clearing. Returning to a previous input may recover a retained result. Clearing after an undeclared external change must cover every affected cache; declaring that external input is usually easier to maintain.
-
-## Capture stable values
-
-A key path to a `Hashable` class can still return a mutable alias. Prefer a value snapshot, such as a computed `measurementContent` property returning immutable text and style data, and select `\.measurementContent`. Do not use a document ID alone to represent edits under the same ID. Use the core's explicit projections and snapshots for more complex value selection.
+A key path to a `Hashable` class still yields a mutable reference. Project mutable objects into immutable value snapshots—for example, expose a computed `measurementContent` property returning immutable text and style data, and select `\.measurementContent`. See [select stable values](../Documentation/DerivedKeysUI.docc/CacheContract.md#select-stable-values).
 
 ### Select authoritative model text
 
-When the application already owns the displayed text, select that model property directly. In this example, `ArticleView.model` contains an ordinary `Article` value whose `text` is a `String`. Assigning or editing the model updates `textView.text` before the next size request:
+When your model already owns the displayed text, select that model property directly rather than reading text back from UIKit. Here `ArticleView.model` holds an `Article` value whose `text` is a `String`, and updating the model updates `textView.text` before the next measurement:
 
 ```swift
 @MainActor
@@ -136,30 +138,24 @@ func makeArticleTextSizes() -> SizeCache<ArticleView> {
 }
 ```
 
-Retain the returned cache in the application's chosen owner, then call `textSizes.size(of: view, toFit: proposal)`. The [complete iOS 16 compiler fixture](../Fixtures/iOS/ModelTextExample.swift) includes the model, view, and an edit followed by another lookup. It fixes wrapping, text-container insets, padding, direction, and editing/scrolling settings; changing any of those requires another dependency. Font is selected explicitly. Model changes schedule layout, while the owner remains responsible for fitting and assigning the view's frame.
+Retain the cache in your chosen owner and call `textSizes.size(of: view, toFit: proposal)`. The [complete iOS 16 compiler fixture](../Fixtures/iOS/ModelTextExample.swift) shows the model, view, and an edit followed by another lookup. It keeps wrapping, text-container insets, line-fragment padding, layout direction, and editing and scrolling settings fixed; if any of those can change, select them as dependencies alongside `\.textView.font`.
 
-Equal strings can have different backing storage and hashing costs. In the [UIKit string measurements](../Benchmarks/String-Results.md), selecting native model text was substantially cheaper for repeated requests than reading identical text back from `UITextView`. A model's `String` property does not guarantee contiguous UTF-8: a string assigned from UIKit can keep its bridged representation. DerivedKeys does not normalize strings automatically.
+Equal Swift strings can have different backing storage and hashing costs. In the [UIKit string measurements](../Benchmarks/String-Results.md), selecting native model text was substantially faster on repeated lookups than reading identical text back from `UITextView`. Note that a model's `String` property is not guaranteed to be contiguous UTF-8 if it was assigned from UIKit, and DerivedKeys does not normalize strings automatically.
 
-The model must remain authoritative and agree with the rendered content during measurement. If editing happens in the text view, synchronize the model before lookup or select the text view's current text. A stale model key can reuse an incorrect size. Full text remains a valid dependency; no content ID, revision, or custom wrapper is required.
+When you select a model property, the model and the rendered view must agree during measurement. If editing happens directly in the `UITextView`, update the model before lookup or select `\.textView.text` instead; otherwise a stale model value can reuse an outdated size. Full text works directly as a dependency without content IDs, revisions, or custom wrappers.
 
 ### Consider a compact projection after measuring
 
-If full-content hashing still dominates, an optional compact projection is the content's identity together with a reliable revision that changes on every size-relevant edit. Select those existing properties by key path; no wrapper is needed. Independent typography and layout inputs still need dependencies. A revision that misses an edit makes reuse incorrect. Do not reuse an identity/revision pair for different size-relevant content while affected entries may remain. The identity and revision must identify the same size-relevant content across all roots sharing the cache. Measure the full request and its hit rate before adopting this extra application contract; ordinary full-content dependencies remain the default. The [performance guide](../Benchmarks/README.md#choosing-dependencies-for-an-application) provides the measured comparison.
+If profiling shows that hashing full content still dominates lookup time, you can select a content identity together with a revision that increments on every size-relevant edit. Select those existing properties by key path—no wrapper is needed—and continue to select independent typography and layout inputs. Correctness then depends on that revision: missing an edit returns a stale size, and reusing an identity and revision pair for different size-relevant content while entries remain cached can return the wrong measurement. Measure the full request and hit rate before taking on this extra contract; selecting full content remains the default. See the [performance guide](../Benchmarks/README.md#choosing-dependencies-for-an-application) for the measured comparison.
 
-## Inspect snapshots and composition limits
+## Inspect snapshots
 
-Selection and calculation are synchronous on the main actor. Keep selected values and any other result-relevant state consistent throughout the request. Dependency getters must read values without mutation, I/O, or recursive evaluation.
-
-A hit still reads all declared dependencies and hashes and compares their full snapshots, but does not invoke measurements or consult child result storage. `snapshot(of:)` exposes the dependency snapshot for inspection; it excludes proposal and recipe identity and is not a complete result key on its own.
-
-Public construction cannot create a cycle in the immutable graph. Its limit is 64 snapshot nodes per path, counting value leaves and composition boundaries. Mapping adds no boundary. An empty cache has depth one; a cache selecting a property has depth two; a parent adds one. Excess depth fails a descriptive precondition. Same-cache measurement reentry, including result inspection/removal through an alias, also fails a precondition; nesting different caches is supported.
+`snapshot(of:)` returns the captured `DependencySnapshot` for a root so you can inspect or compare selected values in tests and debugging. Because it excludes the fitting proposal, it is not a complete cache key on its own.
 
 ## Integrate with UIKit layout
 
-Changing content, scheduling a UIKit layout pass, asking for another size, and assigning the outer frame remain separate application actions. The document example synchronizes text and line limits at initialization and model changes, and category-only fonts at initialization and trait changes. Its control getters do not configure the controls. It schedules layout when content or category changes. The controller remains responsible for refitting and assigning the container frame.
-
-A native-fitting cache calls the passed view's `sizeThatFits(_:)` on a miss. Calling that same cache from that view's override reenters the cache and fails a precondition. Use a closure recipe that measures children or calls a separate uncached calculation. A closure that calls the same view's cached `sizeThatFits(_:)` still reenters the cache. The convenience initializer does not infer dependencies or make mutable `Hashable` aliases stable.
+A native-fitting `SizeCache<View>` calls the root view's `sizeThatFits(_:)` on a miss. Do not call that cache from inside that same view's `sizeThatFits(_:)` override, or a miss will [reenter the cache](../Documentation/DerivedKeysUI.docc/CacheContract.md#reentrancy) and fail a precondition. To cache a custom view's `sizeThatFits(_:)`, use the closure initializer with a recipe that measures child caches or calls a separate uncached layout routine.
 
 ## Choose a lower-level result API
 
-Use `MainActorResultCache` or `ResultCache` for key-path selection with results other than `CGSize`, or when one cached result feeds into the next; see the [result-cache guide](Result-Caches.md). Use `DerivedKeysUIKit.LayoutCache` to cache application-defined results containing overall size and child frames, with explicit inputs and an automatic fitting-proposal key. Its [frame-layout guide](UI-Measurement.md) shows that API. Use the [generic core](Generic-Core.md) for throwing calculations, typed operation keys, or runtime dependency graphs.
+Use `MainActorResultCache` or `ResultCache` when you want key-path selection for results other than `CGSize`, or when one cached result feeds into the next; see the [result-cache guide](Result-Caches.md). Use `LayoutCache` from `DerivedKeysUI` to cache custom layout structs containing overall size and subview frames, with explicit inputs and an automatically keyed fitting proposal; see the [frame-layout guide](UI-Measurement.md). Use the [generic core](Generic-Core.md) for throwing calculations, typed operation keys, or runtime dependency graphs.

@@ -1,16 +1,16 @@
 # Using the generic key and memoization APIs
 
-Import `DerivedKeys` to select dependencies and manage synchronous reuse directly. If you want to bind key paths and a nonthrowing calculation once, start with `ResultCache` in the [result-cache guide](Result-Caches.md). Use the lower-level types in this guide for explicit value snapshots, typed operation keys, runtime source graphs, or throwing calculations. The [document exporter](Document-Export.md) shows a complete non-UI computation with a retained cache.
+Import `DerivedKeys` to build dependency keys and manage synchronous reuse directly. If you only need to bind key paths and a nonthrowing recipe once, start with `ResultCache` in the [result-cache guide](Result-Caches.md). Reach for the lower-level types in this guide when you want explicit value snapshots, typed operation keys, runtime source graphs, or throwing calculations. The [document exporter](Document-Export.md) shows a complete non-UI calculation backed by a retained `MemoizationCache`.
 
-For UI sizing, the [sizing convenience API](../README.md) uses the same snapshots and bounded storage and owns its main-actor measurement recipe. The generic API described here has no main-actor requirement.
+For UI sizing, the [README](../README.md) introduces `SizeCache`, which builds on the same snapshots and bounded LRU storage. Nothing in `DerivedKeys` requires the main actor.
 
 ## Selecting dependencies
 
 ### Fixed schemas and explicit snapshots
 
-For a fixed schema, capture the inputs of one operation in a small `Hashable` value struct. `RequestKey<Operation, Dependencies, Context>` adds a nominal operation type, algorithm version, and environment. Declare a separate operation enum for unrelated calculations, including when storing requests in an `AnyHashable` dictionary. A free-form label does not separate operations.
+When a calculation has a fixed set of inputs, capture them in a small `Hashable` value struct. `RequestKey<Operation, Dependencies, Context>` pairs that dependency value with a nominal operation type, an optional algorithm version, and an environment context. Declare a distinct uninhabited enum for each unrelated calculation—even if you store erased keys in an `AnyHashable` dictionary—because string labels alone do not separate operations at the type level.
 
-`OriginalKey` labels one captured value. `DerivedKey` labels a composition, and `KeyPair` holds two heterogeneous children without type erasure. Domain structs make larger fixed schemas readable. `KeyProjection` stores a reusable synchronous function from explicit input to dependencies:
+For smaller or ad hoc schemas, `OriginalKey` labels a single captured value, `DerivedKey` labels a parent composition, and `KeyPair` combines two heterogeneous keys without type erasure; domain structs remain easier to read once a schema grows. `KeyProjection` wraps a synchronous function from an input root to a `RequestKey`:
 
 ```swift
 import DerivedKeys
@@ -41,13 +41,13 @@ let lowercase = projection.key(for: document, context: "plain-text")
 assert(first != lowercase)
 ```
 
-The projection selects text and the export preference from the larger document. Selection changes leave the key equal; changing the export preference changes it. Calculate from the captured `ExportInput` in the key, or capture one input and use it for both projection and calculation.
+Here `projection` selects only `text` and `uppercase` from `Document`. Toggling `isSelected` leaves the key unchanged; toggling `uppercase` produces a distinct key. Run your calculation from the `ExportInput` stored on `key.dependencies`, or capture a single input snapshot and pass it to both the projection and the calculation.
 
-Keep every value's equality and hashing stable for the lifetime of a key. `Hashable` does not ensure immutability: copying a mutable class reference is not a snapshot. Project its content into immutable values instead. A content ID alone cannot describe edits under that ID. A revision is sufficient only if it covers every relevant mutation, is paired with a unique content identity, and the pair is not reused for different content while entries may remain.
+Every value stored in a key must keep stable equality and hashing for the key's lifetime. Copying a mutable class reference does not freeze its contents, so project class state into immutable values before building the key; see [select stable values](../Documentation/DerivedKeysUI.docc/CacheContract.md#select-stable-values) for content IDs and revisions.
 
 ### Runtime composition and live reads
 
-`KeySource<Input>` describes an immutable graph of dependency reads. Its providers run when `snapshot(for:)` is called, producing a `DependencySnapshot` with the evaluated values and structure. Use that snapshot in a key; sources themselves are not dictionary keys.
+When dependency structure is assembled at runtime, `KeySource<Input>` describes an immutable directed acyclic graph of dependency reads. Calling `snapshot(for:)` evaluates the graph's provider closures and returns a `DependencySnapshot` holding the captured values and tree structure. Use that snapshot inside a key (`KeySource` itself is not a dictionary key):
 
 ```swift
 import DerivedKeys
@@ -71,9 +71,9 @@ let key = RequestKey(
 assert(key.dependencies == source.snapshot(for: input))
 ```
 
-The closure convenience requires `@Sendable`, so an actor-isolated closure cannot be silently stored as a nonisolated callback. Inputs and returned `Hashable` values need not be `Sendable`. For live non-Sendable state, conform a reader to `KeyValueProvider` and pass it as `provider:`. Its `nonisolated value(for:)` method makes the execution contract explicit without making the reader transferable. `KeyProjection` also accepts this reader form. Keep that state within its mutation owner.
+Providers are ordinary closures, and neither the `Input` nor the returned `Hashable` value needs to be `Sendable`. `KeySource` and `KeyProjection` are not `Sendable` either: Swift 6 region isolation keeps a source built from actor-isolated closures inside that actor's isolation domain, so a source that reads a `@MainActor` object stays on the main actor without extra wrappers or protocols. Always evaluate live state inside the domain that owns its mutations.
 
-This reader retains a mutable, non-Sendable store and returns its current text as a stable `String` value. `captureLiveText()` owns the store and source for one synchronous operation; neither escapes to another concurrency domain. Earlier snapshots retain their captured text after the store changes.
+In the example below, the provider reads a mutable, non-`Sendable` store and returns its current `String` value. `captureLiveText()` owns both the store and the source for one synchronous scope; earlier snapshots keep their captured strings after the store changes:
 
 ```swift
 import DerivedKeys
@@ -86,17 +86,9 @@ final class DocumentStore {
     }
 }
 
-struct DocumentTextProvider: KeyValueProvider {
-    let store: DocumentStore
-
-    nonisolated func value(for input: Void) -> String {
-        store.text
-    }
-}
-
 func captureLiveText() {
     let store = DocumentStore(text: "Hello")
-    let source = KeySource<Void>("text", provider: DocumentTextProvider(store: store))
+    let source = KeySource<Void>("text", provider: { store.text })
     let first = source.snapshot(for: ())
     store.text = "Goodbye"
     let edited = source.snapshot(for: ())
@@ -108,28 +100,28 @@ func captureLiveText() {
 captureLiveText()
 ```
 
-Providers must be synchronous, side-effect-free reads: no I/O, mutation, suspension, or recursive evaluation. Actor-isolated properties belong in an explicit snapshot captured by the actor before calling the source. Sources retain their providers, so avoid owner/source capture cycles; evaluated keys and cache entries do not retain those providers. A weak-owner adapter should represent a missing owner explicitly, never fabricate a valid dependency value.
+During a single `snapshot(for:)` call, each distinct `KeySource` runs its provider once, even when multiple parent sources share it as a child. Deduplicating a shared source within one call does not synchronize separate properties across mutations: capture related state in one synchronous pass and run your calculation before anything mutates. No change notification or `update()` call is needed, and when values change from A to B and back to A, `snapshot(for:)` produces a snapshot equal to the original.
 
-Each distinct source is read once per evaluation, even when shared by several parents. Reading each source once does not synchronize different properties or sources. Capture related state together, then calculate from the same snapshot without an intervening mutation. No change notification or `update()` call is needed. When values return A → B → A, the original key is restored.
+Providers must be synchronous, side-effect-free reads—no I/O, mutation, suspension, or recursive source evaluation. Because a `KeySource` retains its provider closure, avoid strong reference cycles between a source and its owner; evaluated snapshots, keys, and cache entries never retain providers. If a provider captures its owner weakly, return an explicit sentinel when the owner is `nil` rather than fabricating a normal dependency value.
 
-Composition preserves labels, original versus derived nodes, concrete value types, order, multiplicity, optional presence, and nested boundaries. Empty derived compositions are valid. `appending` returns a new derived source; rebinding a child variable does not change an existing composition. Build large collections with `init(_:children:)`: repeated appends copy the child array. Graph depth is limited to 64 nodes per path; construction throws beyond that bound. Immutable edges prevent graph cycles.
+Composed snapshots preserve node labels, leaf (`OriginalKey`) versus derived (`DerivedKey`) kinds, concrete value types, child order, duplicate child occurrences (multiplicity), `Optional` presence, and nesting boundaries. Empty derived compositions are valid. Because arrays and child lists preserve order, use a `Set`, a `Dictionary` (whose `Hashable` conformance is order-independent), or canonical sorting when input order does not affect your calculation—never turn incidental dictionary iteration order into an ordered dependency list.
 
-Arrays preserve order. For unordered inputs, use a `Set`, a dictionary with its own order-independent `Hashable` semantics, or canonicalize according to the calculation. Do not turn incidental dictionary iteration order into an ordered dependency list.
+Sources are immutable: `appending(_:)` returns a new derived `KeySource`, and rebinding a local child variable does not modify existing compositions. When combining many children, pass the array to `init(_:children:)` rather than calling `appending(_:)` in a loop, which copies the child array on each step. Immutable edges prevent cycles, and graph depth is capped at 64 nodes along any path (construction throws if a composition exceeds 64).
 
 ## Cache behavior and ownership
 
-`MemoizationCache<Key, Value>` requires an explicit nonnegative capacity. Zero disables storage. Hits and successful insertions become most recently used; overflow evicts the least recently used entry. A hit skips the calculation. A thrown calculation propagates its error without insertion or eviction; a cached optional `nil` is a hit. Use `removeValue(for:)`, `removeAll()`, and `count` to manage storage.
+`MemoizationCache<Key, Value>` is a bounded LRU cache that takes an explicit nonnegative `capacity` (`0` disables storage while still running the calculation). Hits and newly inserted misses become most recently used, and overflow evicts the least recently used entry. A hit returns the stored value and skips the calculation. If a throwing calculation throws, the error propagates without inserting an entry or evicting existing ones; if an optional calculation returns `nil`, that `nil` is cached and returned as a hit. Use `removeValue(for:)`, `removeAll()`, and `count` to inspect and manage entries.
 
-The cache is a value type with exclusive mutation. Copies evolve independently, with standard-library copy-on-write costs on later mutation. Reentering the same cache during its calculation is unsupported; separate caches can be composed. Results, like keys, must not change meaning through mutable external aliases. Computations whose side effects must run on every call do not belong in this cache.
+`MemoizationCache` is a value type with exclusive (`mutating`) access. Copies evolve independently, incurring standard-library copy-on-write costs when mutated. Reentering the same cache during its calculation is unsupported, though composing separate caches is fine. Calculations with side effects that must run on every call do not belong in a cache. The [cache contract](../Documentation/DerivedKeysUI.docc/CacheContract.md) states the shared rules for value stability, retention, and clearing.
 
-Typed keys (`RequestKey`, `OriginalKey`, `DerivedKey`, and `KeyPair`) and `MemoizationCache` conform to `Sendable` when their stored types do. `KeySource`, `KeyProjection`, and `DependencySnapshot` are not `Sendable`, though the inputs and `Hashable` values they read need not be. The generic library has no main-actor requirement.
+Typed keys (`RequestKey`, `OriginalKey`, `DerivedKey`, and `KeyPair`) and `MemoizationCache` conform to `Sendable` when their stored types do. `KeySource`, `KeyProjection`, `DependencySnapshot`, and `ResultCache` are not `Sendable`, and the inputs and `Hashable` values they read need not be `Sendable` either.
 
 ### UIKit cache ownership
 
-For UIKit layout, the separate `DerivedKeysUIKit` product provides `LayoutCache`. It is a main-actor reference type: sharing it shares its entries and recency order. It automatically includes the effective fitting proposal and supplies captured inputs to the calculation. Results can be `CGSize` or your own layout struct. It does not retain calculation closures; callers control the values retained by keys and results. Changing a model, scheduling layout, and assigning the resulting size remain application responsibilities. See the [UIKit guide](UI-Measurement.md) for a complete layout request.
+For UIKit layout, `DerivedKeysUI` provides `LayoutCache`, a main-actor reference type that shares entries and recency order when you share the reference. It automatically includes the effective fitting proposal in its key and passes the captured inputs into the calculation closure. Cached results can be `CGSize` or a custom layout struct; see the [UIKit guide](UI-Measurement.md) for a complete example.
 
 ## Account for cache costs
 
-Dictionary indexing and LRU bookkeeping are expected amortized O(1), excluding key hashing/equality and copy-on-write. Key work can grow with content size and repeated child occurrences. The capacity bounds entry count, not bytes: retained keys and results both matter. When profiling warrants it, prepare reusable immutable projections where you control content changes. Swift `Hasher` output is process-local; never persist it or replace a semantic key with its integer hash.
+Dictionary lookup and LRU bookkeeping run in expected amortized O(1) time, excluding key hashing, key equality, and copy-on-write buffer copies. Hashing and comparing keys grows with captured value size and with repeated child occurrences in a snapshot. Likewise, `capacity` bounds entry count rather than byte size, so both retained keys and retained results contribute to memory usage. When profiling justifies it, project large content into a compact immutable value where you control mutations. Swift `Hasher` output is randomly seeded per process—never persist it or replace a full key with its integer hash.
 
-See the [DocC dependency guide](../Documentation/DerivedKeys.docc/DependencyDesign.md) for the full ownership and equality contract.
+See the [DocC dependency guide](../Documentation/DerivedKeys.docc/DependencyDesign.md) for choosing dependencies, and the [cache contract](../Documentation/DerivedKeysUI.docc/CacheContract.md) for the rules every cache shares.

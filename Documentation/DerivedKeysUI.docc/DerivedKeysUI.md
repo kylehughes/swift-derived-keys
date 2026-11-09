@@ -1,12 +1,12 @@
 # ``DerivedKeysUI``
 
-Cache measurements by selected key paths, then compose child caches to reuse an entire layout size.
+Cache view measurements by selected key paths, and compose child caches to reuse a whole layout size.
 
 ## Overview
 
-Create a ``SizeCache`` once on the main actor and retain it across requests. For leaf `UIView`s without child caches, the UIKit convenience initializer takes key paths to the `Hashable` properties that affect sizing and calls the supplied view's `sizeThatFits(_:)` on a miss. For parents with child caches, custom measurement recipes, or non-UIKit roots, use the closure initializer. Both initializers allow zero selected key paths; only the closure initializer accepts children.
+Create a ``SizeCache`` once on the main actor and retain it across requests. For a leaf `UIView`, the UIKit initializer takes key paths to the `Hashable` properties that affect sizing and calls the view's `sizeThatFits(_:)` on a miss. For parents with child caches, custom measurement recipes, or non-UIKit roots, use the closure initializer—the only initializer that accepts children. Both initializers allow zero key paths.
 
-Include every variable property the calculation reads. Any size-affecting settings you omit must stay fixed for the cache's lifetime and match across all roots sharing it. If a setting varies, select it or use a separate cache. Here the caller leaves each label's other settings at the same defaults:
+Select every variable property the measurement reads. In the example below, all other `UILabel` properties stay at their fixed defaults; <doc:CacheContract> explains why unselected settings must not vary:
 
 ```swift
 import DerivedKeysUI
@@ -30,19 +30,17 @@ func measureText(using sizes: SizeCache<UILabel>) -> CGSize {
 }
 ```
 
-Retain the result of `makeTextSizes()` in a view or another main-actor owner, and pass it to `measureText(using:)` for successive requests.
+Retain the cache returned by `makeTextSizes()` on a view or another main-actor owner, and pass it to `measureText(using:)` on each sizing pass.
 
-A lookup supplies the current root and fitting proposal. The root needs neither Hashable nor Sendable conformance and is not implicitly part of the key. The cache automatically keys both fitting dimensions, normalizes signed zero, and supplies that same normalized proposal to the calculation.
-
-Finite nonnegative values are accepted, including the greatest finite value as an unbounded sentinel. NaN, infinity, and negative proposals fail descriptive preconditions. The cache does not round or clamp measurement results.
+Each `size(of:toFit:)` lookup takes the current root and a fitting proposal. The root itself does not need to be `Hashable` or `Sendable` and is not stored in the key. Both proposal axes enter the key automatically; see <doc:CacheContract> for how unconstrained (`greatestFiniteMagnitude` and `+infinity`), zero, and invalid dimensions behave.
 
 ## Compose child measurements
 
-Pass child caches in `children:` when creating a parent with the closure initializer. The native UIKit convenience initializer is for leaves and has no child list. A parent hit skips its calculation and every child result lookup. A parent miss runs the configured calculation, where each child lookup can independently hit. Transform proposals in the calculation and declare any values that affect the transformation. Children key the actual proposals they receive. All declared children participate in the dependency snapshot even when a branch will not measure them.
+To cache a container layout, create a parent ``SizeCache`` with the closure initializer and list its children in `children:`. Every declared child's selected values become part of the parent's key, and the parent's recipe measures children through those same handles. A parent hit returns the cached size immediately and skips the recipe and all child lookups. On a parent miss, the recipe runs and each child lookup can still hit its own cache independently. Debug builds assert if a recipe measures through an undeclared ``SizeCache``; see <doc:CacheContract> for the check and its opt-out.
 
-Use `child.bound(to: \Parent.child)` for a child with a different root type. The resulting ``SizeCacheBinding`` is a main-actor dependency description and measurement handle: pass it in `children:` and capture it to call `size(of:toFit:)` with the parent root. Bindings can be chained, and distinct root bindings are traversed independently.
+When a child cache has a different root type than the parent, map it with `child.bound(to: \Parent.child)`. The returned ``SizeCacheBinding`` serves both as the child description for `children:` and as the handle you call with the parent root inside the recipe. Bindings can be chained and forward lookups directly to the underlying ``SizeCache`` without adding storage.
 
-This pair stacks a title and subtitle without spacing. Both labels use the same fixed default measurement settings apart from their selected text, font, and line limit. Retain the returned parent cache; its calculation retains the bound child handles.
+Here `PairView` stacks a title and subtitle vertically. Both labels share one `UILabel` cache because they keep the same fixed defaults apart from their selected `text`, `font`, and `numberOfLines`:
 
 ```swift
 @MainActor
@@ -81,41 +79,39 @@ func measurePair(using sizes: SizeCache<PairView>) -> CGSize {
 }
 ```
 
-Create the parent with `makePairSizes(titleSizes: makeTextSizes())`, then pass that retained cache to `measurePair(using:)`. The two bindings share the label cache while capturing each label's own values.
-
-Each lookup uses the original cache; binding adds no storage, key identity, or snapshot depth. Inspect or clear the original cache, since bindings expose no count, capacity, or clearing operations.
-
-Use ``SizeDependencies/at(_:)`` when you only need a mapped dependency description. It retains dependency readers without retaining the child cache, binding, measurement closure, or entries. A parent captures child descriptions with the same retention rule. A ``SizeCacheBinding`` does retain its original cache, so capture the handles the calculation calls. The dependency graph is immutable and acyclic by construction, with snapshot depth checked against ``SizeDependencies/maximumDepth``.
-
-## Ownership and completeness
-
-A view, screen-owned bundle, or intentionally shared static property can own caches. Composition imposes no ownership model. Each reference owns one bounded result cache; sharing the reference shares storage and recency. Clearing a parent clears only that cache, and child clearing or eviction does not invalidate a semantically valid parent result. Clear every affected cache if an undeclared external change invalidates results, or represent that change in selected values.
-
-Snapshots retain complete `Hashable` values, their concrete types, and ordered child structure without deep-copying references. Project immutable values, for example through computed properties, and keep all result-relevant state consistent between dependency capture and measurement. The cache retains its measurement closure, and closure captures or reference-valued dependencies can retain objects. Entries do not implicitly retain the root passed to lookup. `SizeCache` does not observe changes or schedule UIKit layout.
-
-Each cache uses the generic core's bounded LRU. Zero capacity disables storage. Same-cache measurement reentry, including count inspection or clearing during the recipe, fails a descriptive precondition before accessing storage. Recursive calls to distinct caches are supported.
-
-Because the UIKit convenience initializer calls the supplied view's `sizeThatFits(_:)` on a miss, do not call that cache from inside the same view's `sizeThatFits(_:)` override. Use the closure initializer and compute the size from child caches or a separate uncached helper. Calling the cached override inside a custom recipe still reenters the cache. Neither initializer discovers undeclared inputs or makes mutable `Hashable` aliases stable.
+Construct the parent once with `makePairSizes(titleSizes: makeTextSizes())` and reuse it across `measurePair(using:)` calls.
 
 ## Cache other results
 
-Use ``MainActorResultCache`` to bind key paths and a synchronous nonthrowing calculation that returns any value. Multiple inputs can travel in a named tuple; select each field that affects the result. This facade does not automatically include or normalize fitting proposals.
+When a main-actor calculation returns something other than a fitted `CGSize`—such as a TextKit line count—use ``MainActorResultCache``. It keys only the key paths you select, with no implicit fitting proposal or child composition. Pass a named tuple when the recipe reads multiple inputs. To chain stages, look up the first cache's result explicitly and pass it into the next cache, unlike ``SizeCache`` children whose raw dependencies enter the parent key without evaluating child results first.
 
-Resolve result stages explicitly: look up a line count, then pass that count into another cache. A later stage keys the values you select from that result. This differs from ``SizeCache`` children, whose original dependencies enter the parent's key without evaluating their results.
-
-The facade shares entries through reference ownership and uses the same bounded LRU storage as the sizing API. Core `ResultCache` offers value-semantic ownership for nonisolated recipes. Neither facade provides built-in text measurement or schedules layout.
+To cache complete layout outputs—such as a fitted size paired with child frames—from explicit `Hashable` inputs, see <doc:LayoutCaches>.
 
 ## Topics
 
-### Cache other results
+### Understand the contract
 
-- ``MainActorResultCache``
+- <doc:CacheContract>
 
 ### Measure and reuse
 
 - ``SizeCache``
 - ``SizeCacheBinding``
-
-### Map and inspect dependencies
-
 - ``SizeDependencies``
+
+### Cache other results
+
+- ``MainActorResultCache``
+
+### Reuse layout results
+
+- <doc:LayoutCaches>
+- ``LayoutCache``
+- ``LayoutKey``
+- ``LayoutInputs``
+
+### Describe fitting bounds
+
+- ``FittingDimension``
+- ``FittingProposal``
+- ``FittingProposalError``

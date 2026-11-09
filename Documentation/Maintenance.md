@@ -1,6 +1,6 @@
 # Tests and maintenance
 
-Use the [specification](../SPEC.md) for implementation requirements and the [README](../README.md) for package usage.
+See the [specification](../SPEC.md) for implementation requirements and the [README](../README.md) for package usage.
 
 ## Run local checks
 
@@ -10,7 +10,7 @@ Prerequisites:
 - **Swift:** 6.4
 - **Python:** 3
 
-Choose a fresh DocC output directory. From the repository root:
+Choose a fresh DocC output directory (`--output` fails if the directory already exists) and run the full check suite from the repository root:
 
 ```sh
 swift build
@@ -31,37 +31,39 @@ Benchmarks/run.sh
 
 ## Interpret validation results
 
-The compiler script builds public-import controls under Swift 6 complete concurrency checking and warnings as errors. It also compiles the core, both UI support modules, and the UI example module, followed by real UIKit key-path and README fixtures, for an explicit iOS 16 simulator deployment target. This checks deployment compatibility; it does not execute tests on iOS 16.
-
-The Simulator script discovers an installed runtime, observes every selected test, and removes only the device it creates.
-
-Precondition fixtures run in isolated debug child processes outside the package test targets: invalid cases must trap with the expected message, and valid controls must exit cleanly. Keep the compiler fixtures (both passing and expected-error cases) and precondition fixtures aligned with the public API contract.
+- **Concurrency and iOS 16 compilation (`Scripts/check-concurrency.py --warnings-policy`):** Builds public-import controls under Swift 6 complete concurrency checking with warnings treated as errors, including negative fixtures that must fail to compile. It also cross-compiles `DerivedKeys`, `DerivedKeysUI`, `DerivedKeysUIExample`, and the UIKit key-path and README fixtures against an explicit iOS 16 Simulator deployment target. This verifies iOS 16 source and deployment-target compatibility; it does not execute tests on an iOS 16 runtime.
+- **Preconditions (`Scripts/check-preconditions.py`):** Runs precondition fixtures in isolated debug child processes outside the package test targets. Invalid calls must trap with the expected diagnostic message, and valid controls must exit cleanly. Keep both compiler fixtures and precondition fixtures in sync with the public API contract.
+- **iOS Simulator tests (`Scripts/check-simulator.py`):** Finds an installed iOS Simulator runtime, creates a temporary Simulator device, verifies that every selected test runs, and deletes only the device it created.
 
 ## Measure UIKit performance
 
-The [UIKit performance runner](../Benchmarks/README.md) runs XCTest benchmark fixtures in Release with coverage disabled. Use `python3 Benchmarks/run-uikit.py` for sizing and composition, or add `--suite strings` for UIKit/model text representation costs. Each command creates and removes an owned Simulator. The package's tool-hosted tests require an app host for physical-device execution; none is currently supplied.
+The [UIKit performance runner](../Benchmarks/README.md) executes XCTest benchmark fixtures in Release with code coverage disabled:
 
-`python3 Benchmarks/test-run-uikit.py` checks both suites' result parsing. Ordinary test runs execute small correctness traces. Timing trials are opt-in and do not use performance thresholds as unit-test assertions.
+- Run `python3 Benchmarks/run-uikit.py` for view sizing and child-cache composition.
+- Run `python3 Benchmarks/run-uikit.py --suite strings` for UIKit versus model string lookup costs.
+- Run `python3 Benchmarks/test-run-uikit.py` to test result parsing for both suites.
+
+When no destination is passed, the runner creates and deletes its own Simulator. Because the package uses tool-hosted tests and does not include a host app target, these fixtures cannot run on a physical device as configured. During ordinary `swift test` or `xcodebuild test` runs, the benchmark test case runs a small functional correctness trace rather than timing trials, and never asserts on wall-clock thresholds.
 
 ## Inspect generated documentation
 
-The documentation command extracts macOS and iOS 16 Simulator symbol graphs using the selected Xcode and its Simulator SDK. DocC combines both graph sets so the reference includes UIKit-only APIs alongside the macOS surface. The build fails if a module page, either `SizeCache` initializer page, or the native initializer's `Root: UIView` constraint is missing.
+`Scripts/docs.py` extracts symbol graphs for both macOS and the iOS 16 Simulator using the active Xcode toolchain, then merges them into a single DocC archive so UIKit-only symbols appear alongside the macOS API. The script fails if either module page, either `SizeCache` initializer page, or the UIKit convenience initializer's `Root inherits UIView` availability constraint is missing from the rendered output.
 
-The static site's entry is `/swift-derived-keys/documentation/`; its module pages are `derivedkeys/`, `derivedkeysui/`, and `derivedkeysuikit/` beneath it. Serve the output beneath `/swift-derived-keys/` to check deep links and assets. A build does not deploy documentation.
+Building the site locally does not deploy it. The generated site's root path is `/swift-derived-keys/documentation/`, with module pages at `derivedkeys/` and `derivedkeysui/` underneath; serve the output directory under `/swift-derived-keys/` when checking deep links and static assets locally.
 
 ## Hosted workflows
 
-The [Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run checks and publish static documentation.
+The [GitHub Actions workflows](https://github.com/kylehughes/swift-derived-keys/actions) run CI checks, publish DocC documentation, and verify release candidates.
 
 ### Publish documentation
 
-The Documentation workflow builds and deploys DocC on pushes to `main` and when the repository becomes public. The documentation site is public even when the source repository is private. GitHub Pages must use **GitHub Actions** as its publishing source, and the `github-pages` environment must allow deployments from `main`.
+The Documentation workflow (`documentation.yml`) builds and deploys the DocC site on pushes to `main` and when the repository transitions to public. The GitHub Pages site is public even while the source repository is private. In repository settings, GitHub Pages must use **GitHub Actions** as its build source, and the `github-pages` environment must permit deployments from `main`.
 
-The deployment job consumes only its own run's `documentation-site` artifact. Before publishing, it checks the canonical repository, the public Pages destination, and that the built commit is still the head of `main`. It does not change repository visibility. If an older run is superseded, use the current commit's run instead of publishing the old artifact.
+The deploy job publishes only the `documentation-site` artifact produced by its own workflow run. Before publishing, its guard script verifies the canonical repository (`kylehughes/swift-derived-keys`), the public Pages URL, and that the built commit is still the `HEAD` of `main`; it never alters repository visibility. If a newer push supersedes a run on `main`, trigger or use the latest commit's run instead of re-running the stale job.
 
-The canonical entry is `https://kylehughes.github.io/swift-derived-keys/documentation/`. After deployment, verify that entry, all three module pages, and their navigation and assets. A successful build verifies the documentation artifact; live deployment needs a separate check.
+A green build confirms only that the artifact built cleanly; verify the live site at `https://kylehughes.github.io/swift-derived-keys/documentation/`, including both module pages, navigation, and static assets, after deployment completes.
 
-To rebuild and deploy the current `main` manually:
+To rebuild and deploy `main` manually:
 
 ```sh
 gh workflow run documentation.yml --repo kylehughes/swift-derived-keys --ref main -f deploy=true
@@ -69,4 +71,4 @@ gh workflow run documentation.yml --repo kylehughes/swift-derived-keys --ref mai
 
 ### Prepare a versioned release
 
-Manual release verification requires a version, exact candidate commit, and supplied notes unless generated notes are explicitly selected. Changing repository visibility does not create a version tag or release. Those operations require their own authorization. Keep examples, API comments, [the specification](../SPEC.md), and compiler fixtures aligned with the public API.
+The manual release workflow requires a semantic version, the exact candidate commit SHA, and release notes (unless generated notes are explicitly enabled). Making the repository public does not tag or publish a release; visibility changes and releases are authorized separately. Before cutting a release, verify that the README, guides, doc comments, [specification](../SPEC.md), and compiler fixtures all match the public API.
