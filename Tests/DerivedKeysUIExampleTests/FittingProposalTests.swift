@@ -1,5 +1,5 @@
+import DerivedKeysUI
 import DerivedKeysUIExample
-import DerivedKeysUIKit
 import Testing
 
 struct FittingProposalTests {

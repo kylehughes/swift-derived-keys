@@ -15,15 +15,17 @@ struct UIKitSizeCacheTests {
             proposal in
             button.sizeThatFits(proposal)
         }
+        let textSizing = text.bound(to: \Content.label)
+        let buttonSizing = button.bound(to: \Content.button)
         let parent = SizeCache<Content>(
             dependingOn: \.label.text,
             \.button.isEnabled,
-            children: text.at(\.label),
-            button.at(\.button),
+            children: textSizing,
+            buttonSizing,
             capacity: 2
         ) { root, proposal in
-            let textSize = text.size(of: root.label, toFit: proposal)
-            let buttonSize = button.size(of: root.button, toFit: proposal)
+            let textSize = textSizing.size(of: root, toFit: proposal)
+            let buttonSize = buttonSizing.size(of: root, toFit: proposal)
             return CGSize(width: max(textSize.width, buttonSize.width), height: textSize.height + buttonSize.height)
         }
         let root = Content()

@@ -90,7 +90,7 @@ final class UIKitSizingBenchmarkTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         let attachment = XCTAttachment(data: try encoder.encode(report), uniformTypeIdentifier: "public.json")
-        attachment.name = "DerivedKeysUIKitBenchmarks.json"
+        attachment.name = "DerivedKeysUIBenchmarks.json"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

@@ -23,11 +23,11 @@ import uuid
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = "DerivedKeysUIExampleTests"
 TEST = TARGET + "/UIKitSizingBenchmarkTests/testSizingBenchmarks"
-ATTACHMENT = "DerivedKeysUIKitBenchmarks.json"
+ATTACHMENT = "DerivedKeysUIBenchmarks.json"
 SUITES = {
     "sizing": (TEST, ATTACHMENT),
     "strings": (TARGET + "/UIKitStringBenchmarkTests/testStringRepresentationBenchmarks",
-                "DerivedKeysUIKitStringBenchmarks.json"),
+                "DerivedKeysUIStringBenchmarks.json"),
 }
 COST_INTERPRETATION = (
     "Separate stable-input phases include their observation overhead; "

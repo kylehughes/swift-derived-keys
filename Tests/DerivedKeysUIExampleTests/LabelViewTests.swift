@@ -115,7 +115,7 @@ struct LabelViewTests {
     @Test func invalidWidthsDoNotEnterTheCache() {
         let cache = LabelView.Cache(capacity: 4)
         let view = LabelView(text: paragraph, cache: cache)
-        for width: CGFloat in [-1, .nan, .infinity, -.infinity] {
+        for width: CGFloat in [-1, .nan, -.infinity] {
             #expect(view.sizeThatFits(CGSize(width: width, height: 0)) == .zero)
         }
         #expect(cache.count == 0)
@@ -135,6 +135,9 @@ struct LabelViewTests {
         let label = try #require(view.subviews.first as? UILabel)
         #expect(label.frame.width == size.width - 24)
         // Natural-width fitting and the parent's finite assigned width are distinct proposals.
+        #expect(view.calculationCount == 2)
+        // Positive infinity is the same unconstrained proposal and reuses the natural-width entry.
+        #expect(view.sizeThatFits(CGSize(width: CGFloat.infinity, height: 0)) == size)
         #expect(view.calculationCount == 2)
     }
 }

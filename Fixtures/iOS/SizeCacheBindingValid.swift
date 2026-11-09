@@ -14,7 +14,12 @@ final class UIKitBindingEnvelope {
 
 @MainActor
 func validDefaultFittingAndBinding() {
-    let label = SizeCache<UILabel>(dependingOn: \.text, \.numberOfLines, \.traitCollection.preferredContentSizeCategory, capacity: 2)
+    let label = SizeCache<UILabel>(
+        dependingOn: \.text,
+        \.numberOfLines,
+        \.traitCollection.preferredContentSizeCategory,
+        capacity: 2
+    )
     let button = SizeCache<UIButton>(dependingOn: \.titleLabel?.text, \.isEnabled, capacity: 2)
     let empty = SizeCache<UIView>(capacity: 0)
     let text = label.bound(to: \UIKitBindingRoot.label)
@@ -27,7 +32,7 @@ func validDefaultFittingAndBinding() {
     let root = UIKitBindingRoot()
     _ = parent.size(of: root, toFit: .zero)
     _ = text.bound(to: \UIKitBindingEnvelope.root).size(of: UIKitBindingEnvelope(), toFit: .zero)
-    _ = text.at(\UIKitBindingEnvelope.root).snapshot(of: UIKitBindingEnvelope())
+    _ = text.bound(to: \UIKitBindingEnvelope.root).snapshot(of: UIKitBindingEnvelope())
     _ = label.bound(to: \UILabel.self).size(of: root.label, toFit: .zero)
     _ = empty.size(of: UIView(), toFit: .zero)
 }

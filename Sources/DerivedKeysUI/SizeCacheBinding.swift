@@ -1,69 +1,85 @@
 import CoreGraphics
 import DerivedKeys
 
-/// A main-actor handle for measuring a nested root through its original size cache.
+/// A binding that reads and measures a nested root through its original ``SizeCache``.
 ///
-/// Bindings share the original cache's entries, capacity, recipe, and LRU order. They retain
-/// that cache for measurement, but inherited dependency descriptions retain only immutable
-/// snapshot capture. Mapping adds no snapshot structure or dependency depth. Roots are read
-/// on demand and are not implicitly retained.
+/// Created with ``SizeCache/bound(to:)``, a binding reads the nested root from a parent root by
+/// key path for both dependency capture and measurement. It retains the original cache, shares
+/// its entries, capacity, and recency, and adds no storage or snapshot depth.
+///
+/// Listing a binding in a parent's `children:` retains only its dependency readers; the parent's
+/// recipe must also capture the binding to measure through it. See <doc:CacheContract> for
+/// child-declaration and retention rules.
 @MainActor
 public final class SizeCacheBinding<Root>: SizeDependencies<Root> {
     private let lookup: @MainActor (Root, CGSize) -> CGSize
+    private let target: SizeDeclarations
 
     fileprivate init(
         depth: Int,
+        target: SizeDeclarations,
+        declarations: SizeDeclarations,
         capture: @escaping (Root) -> DependencySnapshot,
         lookup: @escaping @MainActor (Root, CGSize) -> CGSize
     ) {
         self.lookup = lookup
-        super.init(depth: depth, capture: capture)
+        self.target = target
+        super.init(depth: depth, declarations: declarations, capture: capture)
     }
 
-    /// Maps this binding onto another root while sharing the original cache.
+    /// Maps this binding onto a parent of its root.
     ///
-    /// The returned handle retains the original cache. Capturing its dependency description
-    /// in a parent retains only dependency readers; the parent's recipe must capture the
-    /// handle separately to measure through it.
+    /// The returned binding follows both paths and shares the original cache.
     /// - Parameter path: The nonoptional nested root to read from each new parent.
-    /// - Returns: A handle that follows both paths and measures through the original cache.
+    /// - Returns: A binding that accepts the new parent root.
     public func bound<Parent>(to path: KeyPath<Parent, Root>) -> SizeCacheBinding<Parent> {
         let capture = capture
         let lookup = lookup
         return SizeCacheBinding<Parent>(
             depth: depth,
+            target: rebasedDeclarations(of: target, onto: path),
+            declarations: rebasedDeclarations(of: declarations, onto: path),
             capture: { root in capture(root[keyPath: path]) },
             lookup: { root, proposal in lookup(root[keyPath: path], proposal) }
         )
     }
 
-    /// Returns a shared cached size or synchronously measures the mapped root on a miss.
+    /// Returns the cached size for the bound root and proposal, measuring on a miss.
     ///
-    /// Proposal normalization, exact keying, recency, and eviction follow the original cache.
+    /// Proposal handling, recency, and eviction follow the original cache; see
+    /// <doc:CacheContract>.
     /// - Parameters:
-    ///   - root: The parent whose bound path supplies the root to snapshot and measure.
-    ///   - size: The fitting proposal in points passed to the original cache.
+    ///   - root: The parent whose bound path supplies the root to read and measure.
+    ///   - size: The fitting proposal in points, passed to the original cache.
     /// - Returns: The retained size on a hit, or the original recipe's result on a miss.
-    /// - Precondition: Both proposal axes are finite and nonnegative; the original cache
-    ///   is not measuring, including through another binding.
+    /// - Precondition: Both proposal axes are nonnegative and not NaN, and the original cache is
+    ///   not measuring, including through another binding. In debug builds, a lookup from inside
+    ///   another size cache's recipe also requires the original cache—and this binding's path
+    ///   when `Root` is that parent's root—to be declared in the parent's `children:`, unless
+    ///   the parent allows undeclared measurements.
     public func size(of root: Root, toFit size: CGSize) -> CGSize {
-        lookup(root, size)
+        #if DEBUG
+        DeclaredChildren.noteBinding(target)
+        #endif
+        return lookup(root, size)
     }
 }
 
 extension SizeCache {
-    /// Binds this cache to a nested root while sharing its entries and measurement recipe.
+    /// Binds this cache to a nested root of a parent.
     ///
-    /// The binding retains this cache. Its inherited snapshot and descriptor operations
-    /// retain only immutable capture; they do not measure or change cache recency.
-    /// Binding preserves dependency depth and snapshot structure.
-    /// - Parameter path: The nonoptional nested root to read from each parent for both
+    /// Pass the binding in a parent's `children:` and capture it in the parent's recipe. The
+    /// binding retains this cache, shares its entries and recency, and leaves dependency depth
+    /// and snapshot structure unchanged; see <doc:CacheContract>.
+    /// - Parameter path: The nonoptional nested root to read from each parent, for both
     ///   dependency capture and measurement.
-    /// - Returns: A handle that accepts the parent root and shares this cache.
+    /// - Returns: A binding that accepts the parent root.
     public func bound<Parent>(to path: KeyPath<Parent, Root>) -> SizeCacheBinding<Parent> {
         let capture = capture
         return SizeCacheBinding<Parent>(
             depth: depth,
+            target: rebasedDeclarations(of: ownDeclaration, onto: path),
+            declarations: rebasedDeclarations(of: declarations, onto: path),
             capture: { root in capture(root[keyPath: path]) },
             lookup: { root, proposal in self.size(of: root[keyPath: path], toFit: proposal) }
         )

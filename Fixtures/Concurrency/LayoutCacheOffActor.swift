@@ -1,4 +1,4 @@
-import DerivedKeysUIKit
+import DerivedKeysUI
 
 // expected-error: call to main actor-isolated instance method 'value(for:proposal:context:compute:)' in a synchronous nonisolated context
 func invalidLayoutAccess(_ cache: LayoutCache<Operation, Int, Int, Int>, proposal: FittingProposal) {

@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import tempfile
 
-MODULES = ['DerivedKeys', 'DerivedKeysUI', 'DerivedKeysUIKit']
+MODULES = ['DerivedKeys', 'DerivedKeysUI']
 BASE_PATH = 'swift-derived-keys'
 
 
@@ -25,7 +25,7 @@ def extract_graphs(arguments):
 def validate_site(output: Path):
     pages = [(module, module, "module") for module in MODULES]
     pages += [("DerivedKeysUI", "DerivedKeysUI/SizeCache/" + title, "init") for title in [
-        "init(dependingOn:capacity:)", "init(dependingOn:children:capacity:measure:)"]]
+        "init(dependingOn:capacity:)", "init(dependingOn:children:capacity:allowsUndeclaredMeasurements:measure:)"]]
     for module, symbol, kind in pages:
         relative = "documentation/" + symbol.lower()
         data = output / "data" / (relative + ".json")

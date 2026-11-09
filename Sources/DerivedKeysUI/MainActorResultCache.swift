@@ -1,26 +1,21 @@
 import DerivedKeys
 
-/// A synchronous main-actor LRU cache with one configured calculation.
+/// A main-actor cache that reuses a recipe's result for equal selected values.
 ///
-/// Only selected values form the key. Equal selections reuse results across input instances;
-/// input identity is never implicit. Select `\.self` to include an entire hashable input.
-/// Use a named tuple to include multiple inputs or calculation parameters.
+/// Only the selected key-path values form the key, so inputs with equal selections share a
+/// result. Select `\.self` to include a whole hashable input, or pass a named tuple to combine
+/// several inputs. Select every variable value the recipe reads; see <doc:CacheContract> for
+/// the selection, stability, retention, and clearing rules.
 ///
-/// Select every variable value read by the calculation. Unselected settings must remain fixed
-/// for the cache's lifetime and match across inputs. Selected values must preserve their equality
-/// and hashing while stored; project immutable values from mutable references. The calculation
-/// must read values consistent with the preceding snapshot. Main-actor isolation does not freeze
-/// aliases or observe changes.
-///
-/// The cache retains its calculation and key-path readers. Entries retain selected values and
-/// results without implicitly retaining inputs. Explicit closure captures, reference-valued
-/// selections, and results can retain objects. Sharing a reference shares storage and LRU order;
-/// independently constructed caches have independent storage, even with equal selections.
-/// Reentering the same cache during dependency capture or calculation fails a precondition,
-/// including inspection or removal through an alias. Its immutable capacity remains readable.
+/// Sharing a reference shares storage and recency. This cache does not key a fitting proposal.
+/// Reentering it during dependency capture or while its recipe runs fails a precondition,
+/// including reading ``count`` or removing entries through an alias. ``capacity`` stays
+/// readable.
 @MainActor
 public final class MainActorResultCache<Input, Value> {
-    /// The maximum number of retained results; zero disables storage.
+    /// The maximum number of retained results.
+    ///
+    /// Zero disables storage.
     public let capacity: Int
 
     private let compute: @MainActor (Input) -> Value
@@ -36,16 +31,16 @@ public final class MainActorResultCache<Input, Value> {
         return Self.count(of: &storage)
     }
 
-    /// Creates a cache from heterogeneous value paths and a retained calculation.
+    /// Creates a cache that keys selected values and runs a recipe on a miss.
     ///
-    /// An empty selection gives every input the same key. The calculation is synchronous,
-    /// nonthrowing, and called only on misses. Neither inputs nor results need to be hashable
-    /// or sendable; only the selected values must be hashable.
+    /// An empty selection gives every input the same key. Neither inputs nor results need to be
+    /// `Hashable` or `Sendable`; only the selected values must be `Hashable`.
     /// - Parameters:
-    ///   - paths: Stable values captured once per path, in order, before lookup or removal.
+    ///   - paths: Key paths to the stable values read once in order before lookup or removal.
     ///   - capacity: The maximum number of retained results; zero disables storage.
-    ///   - compute: The configured calculation, receiving the current input on a miss.
-    /// - Precondition: Capacity is nonnegative.
+    ///   - compute: The synchronous recipe, retained by the cache and called with the current
+    ///     input on a miss.
+    /// - Precondition: `capacity` is nonnegative.
     public init<each Dependency>(
         dependingOn paths: repeat KeyPath<Input, each Dependency>,
         capacity: Int,
@@ -63,7 +58,7 @@ public final class MainActorResultCache<Input, Value> {
         storage = MemoizationCache(capacity: capacity)
     }
 
-    /// Removes all results, releasing their selected values and results.
+    /// Removes all results, keeping the key paths and recipe.
     ///
     /// - Precondition: No operation on this cache is in progress.
     public func removeAll() {
@@ -75,7 +70,8 @@ public final class MainActorResultCache<Input, Value> {
 
     /// Removes the result for the input's current selected values, if present.
     ///
-    /// A changed input can identify a different entry from an earlier lookup.
+    /// An input whose selected values have changed since an earlier lookup identifies a
+    /// different entry.
     /// - Parameter input: The input whose current selected values identify the entry.
     /// - Precondition: No operation on this cache is in progress.
     public func removeValue(for input: Input) {
@@ -85,15 +81,16 @@ public final class MainActorResultCache<Input, Value> {
         storage.removeValue(for: snapshot(of: input))
     }
 
-    /// Returns a cached result or synchronously calculates it on a miss.
+    /// Returns the cached result for the input's selected values, running the recipe on a miss.
     ///
-    /// Selection precedes lookup even on hits. Hits promote recency, and insertion at capacity
-    /// evicts the least recently used result. Optional `nil` results are hits. At zero capacity
-    /// every call calculates. Results are stored without validation or transformation.
-    /// - Parameter input: The current input to snapshot and, on a miss, calculate from.
-    /// - Returns: The retained result on a hit or the configured calculation's result on a miss.
+    /// Every lookup reads the selected values first, including hits. Hits promote recency, and a
+    /// miss at capacity evicts the least recently used result. An optional `nil` result is cached
+    /// as a hit, and results are stored as returned. At zero capacity, every call runs the
+    /// recipe without storing.
+    /// - Parameter input: The current input to read and, on a miss, pass to the recipe.
+    /// - Returns: The retained result on a hit, or the recipe's result on a miss.
     /// - Complexity: Expected amortized constant-time bookkeeping, excluding dependency capture,
-    ///   hashing, equality, and calculation. Capacity bounds entry count rather than bytes.
+    ///   hashing, equality, and the recipe.
     /// - Precondition: No operation on this cache is in progress.
     public func value(for input: Input) -> Value {
         checkAccess()

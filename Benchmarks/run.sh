@@ -37,7 +37,7 @@ benchmark_binary="$benchmark_bin_dir/DerivedKeysBenchmarks"
     fi
     printf '\nSource SHA-256 digests:\n'
     shasum -a 256 Package.swift Benchmarks/run.sh Sources/DerivedKeys/*.swift \
-        Sources/DerivedKeysUIKit/*.swift Sources/DerivedKeysUI/*.swift Sources/DerivedKeysBenchmarks/*.swift
+        Sources/DerivedKeysUI/*.swift Sources/DerivedKeysBenchmarks/*.swift
     printf 'Allocation counts: unknown; no allocation profiler attached.\n'
     printf 'RSS: /usr/bin/time -l per case; whole-process high-water mark.\n'
 } > "$benchmark_output/metadata.txt"

@@ -1,6 +1,6 @@
 #if canImport(UIKit)
 import DerivedKeys
-import DerivedKeysUIKit
+import DerivedKeysUI
 import UIKit
 
 /// A resolved named font, rather than a view or an ambient Dynamic Type dependency.

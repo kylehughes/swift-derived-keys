@@ -1,5 +1,5 @@
 import CoreGraphics
-import DerivedKeysUIKit
+import DerivedKeysUI
 import Testing
 
 @MainActor
@@ -8,7 +8,7 @@ struct LayoutCacheTests {
         FittingProposal(width: try FittingDimension(points: width))
     }
 
-    @Test func completeKeysSeparateInputsProposalsContextsVersionsAndOperations() throws {
+    @Test func completeKeysSeparateInputsProposalsContextsAndOperations() throws {
         let cache = LayoutCache<Operation, String, Int, Int>(capacity: 4)
         let bounds = try proposal()
         let key = cache.key(for: "Text", proposal: bounds, context: 2)
@@ -18,15 +18,12 @@ struct LayoutCacheTests {
         let boundedHeight = FittingProposal(width: bounds.width, height: try FittingDimension(points: 40))
         #expect(key != cache.key(for: "Text", proposal: boundedHeight, context: 2))
         #expect(key != cache.key(for: "Text", proposal: bounds, context: 3))
-        let versioned = LayoutCache<Operation, String, Int, Int>(capacity: 4, version: 1)
-        #expect(key != versioned.key(for: "Text", proposal: bounds, context: 2))
         let otherOperation = LayoutCache<OtherOperation, String, Int, Int>(capacity: 4)
         #expect(AnyHashable(key) != AnyHashable(otherOperation.key(for: "Text", proposal: bounds, context: 2)))
         #expect(cache.count == 0)
         #expect(key.dependencies.input == "Text")
         #expect(key.dependencies.proposal == bounds)
         #expect(key.context == 2)
-        #expect(key.version == 0)
     }
 
     @Test func parentInputsComposeCompleteChildKeys() throws {

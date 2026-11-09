@@ -202,11 +202,11 @@ class RunnerParserTests(unittest.TestCase):
             (directory / "payload.json").write_text('{"schemaVersion": 1}')
             (directory / "manifest.json").write_text(json.dumps(manifest))
             self.assertEqual(runner.read_attachment(directory, "device")[0], {"schemaVersion": 1})
-            attachment["suggestedHumanReadableName"] = "DerivedKeysUIKitBenchmarks_0_32176F42-F0F5-4CE2-B6BC-F6E467807E5E.json"
+            attachment["suggestedHumanReadableName"] = "DerivedKeysUIBenchmarks_0_32176F42-F0F5-4CE2-B6BC-F6E467807E5E.json"
             manifest[0]["testIdentifier"] = runner.TEST.split("/", 1)[1] + "()"
             (directory / "manifest.json").write_text(json.dumps(manifest))
             self.assertEqual(runner.read_attachment(directory, "device")[0], {"schemaVersion": 1})
-            for invalid_name in ("DerivedKeysUIKitBenchmarks_arbitrary.json", "DerivedKeysUIKitBenchmarks_0_wrong.json"):
+            for invalid_name in ("DerivedKeysUIBenchmarks_arbitrary.json", "DerivedKeysUIBenchmarks_0_wrong.json"):
                 attachment["suggestedHumanReadableName"] = invalid_name
                 (directory / "manifest.json").write_text(json.dumps(manifest))
                 with self.assertRaises(ValueError):

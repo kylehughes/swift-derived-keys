@@ -15,8 +15,9 @@ final class SizeChild {
 func validSizeAccess() {
     let child = SizeCache<SizeChild>(dependingOn: \.value, capacity: 2) { _, proposal in proposal }
     let same = SizeCache<SizeRoot>(dependingOn: \.title, \.count, capacity: 2) { _, proposal in proposal }
-    let cache = SizeCache<SizeRoot>(children: same, child.at(\.child), capacity: 2) { root, proposal in
-        child.size(of: root.child, toFit: proposal)
+    let childSizing = child.bound(to: \SizeRoot.child)
+    let cache = SizeCache<SizeRoot>(children: same, childSizing, capacity: 2) { root, proposal in
+        childSizing.size(of: root, toFit: proposal)
     }
     let empty = SizeCache<SizeRoot>(capacity: 0) { _, proposal in proposal }
     let root = SizeRoot()

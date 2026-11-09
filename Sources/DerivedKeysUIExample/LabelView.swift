@@ -1,5 +1,5 @@
 #if canImport(UIKit)
-import DerivedKeysUIKit
+import DerivedKeysUI
 import UIKit
 
 /// A frame-layout example that caches both its fitted size and its label frame.
@@ -70,7 +70,7 @@ public final class LabelView: UIView {
     /// Fits the text to the supplied width, ignoring the supplied height.
     ///
     /// A finite nonnegative width is filled exactly. The greatest-finite-magnitude
-    /// sentinel requests natural width. Invalid widths return zero without caching.
+    /// sentinel or positive infinity requests natural width. Invalid widths return zero without caching.
     /// Widths at or below twice the padding leave a zero-width label and padding-only height.
     public override func sizeThatFits(_ size: CGSize) -> CGSize {
         layout(forWidth: size.width)?.size ?? .zero
@@ -102,7 +102,7 @@ public final class LabelView: UIView {
 
     private func layout(forWidth width: CGFloat) -> Layout? {
         guard
-            let proposal = try? DerivedKeysUIKit.FittingProposal(
+            let proposal = try? FittingProposal(
                 fitting: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
             )
         else {
@@ -119,7 +119,7 @@ public final class LabelView: UIView {
         return layout
     }
 
-    private static func calculate(text: String, proposal: DerivedKeysUIKit.FittingProposal) -> Layout {
+    private static func calculate(text: String, proposal: FittingProposal) -> Layout {
         let width = proposal.fittingSize.width
         let isUnconstrained = width == CGFloat.greatestFiniteMagnitude
         let innerWidth = isUnconstrained ? width : max(0, width - padding * 2)

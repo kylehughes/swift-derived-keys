@@ -18,7 +18,9 @@ func validBindingAccess() {
     let binding: SizeCacheBinding<BindingRoot> = cache.bound(to: \.leaf)
     let chained = binding.bound(to: \BindingEnvelope.root)
     let root = BindingRoot()
-    let parent = SizeCache<BindingRoot>(children: binding, binding, binding.at(\.self), capacity: 1) { root, size in
+    let parent = SizeCache<BindingRoot>(children: binding, binding, binding.bound(to: \BindingRoot.self), capacity: 1) {
+        root,
+        size in
         binding.size(of: root, toFit: size)
     }
     _ = binding.snapshot(of: root)

@@ -8,6 +8,13 @@ struct PreconditionProbe {
         var value = 1
     }
 
+    final class Pair {
+        let first = Root()
+        let second = Root()
+    }
+
+    enum LayoutOperation {}
+
     @MainActor
     final class ReentryState {
         var cache: SizeCache<Root>!
@@ -26,6 +33,45 @@ struct PreconditionProbe {
         let root = Root()
         let proposal = CGSize(width: 100, height: 20)
         switch name {
+        case "layout-reentry-lookup", "layout-reentry-count", "layout-reentry-remove", "layout-reentry-clear":
+            let bounds = FittingProposal(width: .unconstrained)
+            let cache = LayoutCache<LayoutOperation, Int, Int, Int>(capacity: 2)
+            _ = cache.value(for: 1, proposal: bounds, context: 0) { input, _, _ in
+                _ = cache.capacity
+                _ = cache.key(for: input, proposal: bounds, context: 0)
+                switch name {
+                case "layout-reentry-count": _ = cache.count
+                case "layout-reentry-remove":
+                    cache.removeValue(for: cache.key(for: input, proposal: bounds, context: 0))
+                case "layout-reentry-clear": cache.removeAll()
+                default: _ = cache.value(for: input, proposal: bounds, context: 0) { input, _, _ in input }
+                }
+                return input
+            }
+        case "declared-child", "undeclared-child", "undeclared-child-opt-out":
+            let child = SizeCache<Root>(capacity: 1) { _, size in size }
+            let parent: SizeCache<Root>
+            switch name {
+            case "declared-child":
+                parent = SizeCache<Root>(children: child, capacity: 1) { root, size in
+                    child.size(of: root, toFit: size)
+                }
+            case "undeclared-child":
+                parent = SizeCache<Root>(capacity: 1) { root, size in child.size(of: root, toFit: size) }
+            default:
+                parent = SizeCache<Root>(capacity: 1, allowsUndeclaredMeasurements: true) { root, size in
+                    child.size(of: root, toFit: size)
+                }
+            }
+            precondition(parent.size(of: root, toFit: proposal) == proposal)
+        case "undeclared-binding-path":
+            let leaf = SizeCache<Root>(dependingOn: \.value, capacity: 1) { _, size in size }
+            let declared = leaf.bound(to: \Pair.first)
+            let measured = leaf.bound(to: \Pair.second)
+            let parent = SizeCache<Pair>(children: declared, capacity: 1) { pair, size in
+                measured.size(of: pair, toFit: size)
+            }
+            precondition(parent.size(of: Pair(), toFit: proposal) == proposal)
         case "valid-dimensions":
             let cache = SizeCache<Root>(capacity: 1) { _, size in size }
             for dimension in [CGFloat.zero, -CGFloat.zero, CGFloat.greatestFiniteMagnitude] {

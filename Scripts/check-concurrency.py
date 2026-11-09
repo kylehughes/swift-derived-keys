@@ -85,7 +85,7 @@ def check_ios(compiler, architecture, directory):
                 "-warnings-as-errors", "-target", architecture + "-apple-ios16.0-simulator",
                 "-sdk", sdk, "-I", str(directory)]
     modules = []
-    for name in ("DerivedKeys", "DerivedKeysUIKit", "DerivedKeysUI", "DerivedKeysUIExample"):
+    for name in ("DerivedKeys", "DerivedKeysUI", "DerivedKeysUIExample"):
         sources = sorted((ROOT / "Sources" / name).glob("*.swift"))
         if not sources:
             raise SystemExit("No iOS sources found for " + name)
@@ -108,10 +108,10 @@ def check_ios(compiler, architecture, directory):
             print(diagnostics)
             break
     results = []
-    if len(modules) == 4 and all(module["passed"] for module in modules):
+    if len(modules) == 3 and all(module["passed"] for module in modules):
         results = [compile_fixture(compiler, settings, fixture, directory)
                    for fixture in sorted((ROOT / "Fixtures/iOS").glob("*.swift"))]
-    passed = (len(modules) == 4 and all(module["passed"] for module in modules)
+    passed = (len(modules) == 3 and all(module["passed"] for module in modules)
               and bool(results) and all(result["passed"] for result in results))
     return {"settings": settings, "modules": modules, "results": results, "passed": passed}
 

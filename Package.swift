@@ -6,7 +6,6 @@ let package = Package(
     platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(name: "DerivedKeys", targets: ["DerivedKeys"]),
-        .library(name: "DerivedKeysUIKit", targets: ["DerivedKeysUIKit"]),
         .library(name: "DerivedKeysUI", targets: ["DerivedKeysUI"]),
         .executable(name: "DocumentExportExample", targets: ["DocumentExportExample"]),
         .executable(name: "DerivedKeysBenchmarks", targets: ["DerivedKeysBenchmarks"]),
@@ -14,18 +13,13 @@ let package = Package(
     targets: [
         .target(name: "DerivedKeys", swiftSettings: [.treatAllWarnings(as: .error)]),
         .target(
-            name: "DerivedKeysUIKit",
+            name: "DerivedKeysUI",
             dependencies: ["DerivedKeys"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .target(
-            name: "DerivedKeysUI",
-            dependencies: ["DerivedKeys", "DerivedKeysUIKit"],
-            swiftSettings: [.treatAllWarnings(as: .error)]
-        ),
-        .target(
             name: "DerivedKeysUIExample",
-            dependencies: ["DerivedKeys", "DerivedKeysUIKit", "DerivedKeysUI"],
+            dependencies: ["DerivedKeys", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .executableTarget(
@@ -44,18 +38,13 @@ let package = Package(
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .testTarget(
-            name: "DerivedKeysUIKitTests",
-            dependencies: ["DerivedKeys", "DerivedKeysUIKit"],
-            swiftSettings: [.treatAllWarnings(as: .error)]
-        ),
-        .testTarget(
             name: "DerivedKeysUITests",
             dependencies: ["DerivedKeys", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .testTarget(
             name: "DerivedKeysUIExampleTests",
-            dependencies: ["DerivedKeysUIExample", "DerivedKeysUIKit", "DerivedKeysUI"],
+            dependencies: ["DerivedKeysUIExample", "DerivedKeysUI"],
             swiftSettings: [.treatAllWarnings(as: .error)]
         ),
     ],

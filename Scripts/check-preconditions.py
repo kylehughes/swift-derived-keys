@@ -46,10 +46,16 @@ def main():
                       "MainActorResultCache cannot be reentered while an operation is in progress."
                       for phase in ("capture", "compute", "removal")
                       for operation in ("lookup", "count", "remove", "clear")})
+        cases.update({f"layout-reentry-{operation}": "LayoutCache cannot be reentered while a calculation is in progress."
+                      for operation in ("lookup", "count", "remove", "clear")})
+        cases.update({"declared-child": None, "undeclared-child-opt-out": None,
+                      "undeclared-child": "SizeCache measured through a child that its parent did not declare in children:."})
+        cases["undeclared-binding-path"] = cases["undeclared-child"]
         for operation in ("size", "remove", "bound"):
             for axis in ("width", "height"):
-                for invalid in ("nan", "infinity", "negativeInfinity", "negative"):
-                    cases[f"{operation}-{axis}-{invalid}"] = f"SizeCache proposal {axis} must be finite and nonnegative."
+                cases[f"{operation}-{axis}-infinity"] = None
+                for invalid in ("nan", "negativeInfinity", "negative"):
+                    cases[f"{operation}-{axis}-{invalid}"] = f"SizeCache proposal {axis} must be nonnegative and not NaN."
         for name, expected in cases.items():
             command = [binary, name]
             record = {"case": name, "command": command, "expected_diagnostic": expected, "passed": False}

@@ -5,6 +5,16 @@ import UIKit
 
 @MainActor
 struct UIKitDefaultSizeCacheTests {
+    @Test func nativeFittingPermitsAViewThatConsultsItsOwnCache() {
+        let inner = SizeCache<SelfCachingView>(dependingOn: \.value, capacity: 2) { view, _ in
+            CGSize(width: view.value, height: 1)
+        }
+        let outer = SizeCache<SelfCachingView>(dependingOn: \.value, capacity: 2)
+        let view = SelfCachingView(cache: inner)
+        #expect(outer.size(of: view, toFit: .zero) == CGSize(width: 3, height: 1))
+        #expect(inner.count == 1)
+    }
+
     @Test func fittingReceivesSuppliedViewAndNormalizedExactProposal() {
         let cache = SizeCache<ProbeView>(dependingOn: \.content.text, \.enabled, capacity: 8)
         let first = ProbeView()
@@ -62,6 +72,25 @@ extension UIKitDefaultSizeCacheTests {
             received.append(size)
             return size
         }
+    }
+}
+@MainActor
+private final class SelfCachingView: UIView {
+    var value: CGFloat = 3
+    private let cache: SizeCache<SelfCachingView>
+
+    init(cache: SizeCache<SelfCachingView>) {
+        self.cache = cache
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is unavailable")
+    }
+
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        cache.size(of: self, toFit: size)
     }
 }
 #endif

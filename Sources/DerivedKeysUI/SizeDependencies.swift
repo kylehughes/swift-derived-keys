@@ -1,45 +1,48 @@
 import DerivedKeys
 
-/// An immutable description of the values consumed by a size calculation.
+/// An immutable description of the selected values a size recipe reads from a root.
 ///
-/// Descriptions capture complete values and ordered child structure, without observing
-/// roots or retaining them implicitly. Hashable projections must remain semantically
-/// stable while cached. Each occurrence is evaluated independently, including repeated
-/// mappings of one description. Construction is closed to external subclasses.
+/// ``SizeCache`` and ``SizeCacheBinding`` are the only concrete descriptions; pass them in a
+/// parent's `children:` list. You cannot subclass `SizeDependencies` outside the module. A
+/// description captures complete values and ordered child structure from a root on demand
+/// without retaining the root, and evaluates each child occurrence separately—including repeated
+/// bindings of one cache; see <doc:CacheContract>.
 @MainActor
 public class SizeDependencies<Root> {
-    /// The maximum depth of a captured dependency snapshot.
+    /// The maximum number of snapshot nodes on any path of a description.
     public static var maximumDepth: Int { DependencySnapshot.maximumDepth }
 
     let capture: (Root) -> DependencySnapshot
     let depth: Int
+    let childDeclarations: SizeDeclarations
 
-    init(depth: Int, capture: @escaping (Root) -> DependencySnapshot) {
+    /// The caches this description declares to a parent, used by the debug declared-children check.
+    var declarations: SizeDeclarations { childDeclarations }
+
+    init(depth: Int, declarations: SizeDeclarations, capture: @escaping (Root) -> DependencySnapshot) {
         self.capture = capture
         self.depth = depth
+        childDeclarations = declarations
     }
 
-    /// Maps this description onto a nested root without adding snapshot structure.
-    ///
-    /// The returned description retains the immutable capture recipe, not this cache's
-    /// result storage or measurement closure. Mapping does not increase dependency depth.
-    /// - Parameter path: The nonoptional nested root to read from each parent. This maps
-    ///   dependency capture only; use `bound(to:)` on a cache or binding to measure through it.
-    /// - Returns: A description that reads the nested root without retaining result storage.
-    public func at<Parent>(_ path: KeyPath<Parent, Root>) -> SizeDependencies<Parent> {
-        let capture = capture
-        return SizeDependencies<Parent>(depth: depth) { root in
-            capture(root[keyPath: path])
-        }
+    // Release builds must not evaluate declarations at all: they exist only for the debug check.
+    func rebasedDeclarations<Parent>(
+        of declarations: @autoclosure () -> SizeDeclarations,
+        onto path: KeyPath<Parent, Root>
+    ) -> SizeDeclarations {
+        #if DEBUG
+        declarations().rebased(onto: path)
+        #else
+        .none
+        #endif
     }
 
-    /// Captures the described values and ordered structure without measuring or changing recency.
+    /// Captures the described values and structure without measuring or changing recency.
     ///
-    /// Snapshots exclude the fitting proposal and measurement recipe identity, so a snapshot
-    /// alone is not a complete size-result key. Cost is linear in the described graph and
-    /// projected value work; repeated child occurrences are evaluated separately.
+    /// The snapshot excludes the fitting proposal, so it is not a complete result key.
     /// - Parameter root: The current root whose selected values are captured.
-    /// - Returns: The selected values and structure, excluding proposal and recipe identity.
+    /// - Returns: The selected values and their structure.
+    /// - Complexity: Linear in the described graph plus the work of reading each value.
     public func snapshot(of root: Root) -> DependencySnapshot {
         capture(root)
     }

@@ -66,7 +66,10 @@ struct SizeCacheBindingTests {
         let direct = cache.bound(to: \SizeTestItem.self)
         let nested = cache.bound(to: \SizeTestPanel.first).bound(to: \Envelope.panel)
         #expect(direct.snapshot(of: root.panel.first) == cache.snapshot(of: root.panel.first))
-        #expect(nested.snapshot(of: root) == cache.at(\SizeTestPanel.first).at(\Envelope.panel).snapshot(of: root))
+        #expect(
+            nested.snapshot(of: root)
+                == cache.bound(to: \SizeTestPanel.first).bound(to: \Envelope.panel).snapshot(of: root)
+        )
         #expect(nested.size(of: root, toFit: .zero) == .zero)
     }
 
@@ -95,8 +98,8 @@ struct SizeCacheBindingTests {
         #expect(weakToken == nil)
     }
 
-    @Test(arguments: ["direct", "chained", "descriptor"])
-    func parentOnlyDescriptionsReleaseBindingCacheAndRecipe(mapping: String) {
+    @Test(arguments: ["direct", "chained"])
+    func parentsRetainOnlyDependencyReadersOfBindingsInChildren(mapping: String) {
         var token: SizeTestItem? = SizeTestItem(7)
         weak let weakToken = token
         var cache: SizeCache<SizeTestItem>? = SizeCache(dependingOn: \.value, capacity: 1) { [token] _, _ in
@@ -112,8 +115,7 @@ struct SizeCacheBindingTests {
             let description: SizeDependencies<Envelope>
             switch mapping {
             case "direct": description = cache!.bound(to: \Envelope.panel.first)
-            case "chained": description = chained!
-            default: description = binding!.at(\Envelope.panel)
+            default: description = chained!
             }
             parent = SizeCache<Envelope>(children: description, capacity: 1) { _, size in size }
         }

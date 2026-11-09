@@ -1,6 +1,5 @@
 // Complete examples from the UI and UIKit DocC overviews and Examples/UI-Measurement.md.
 import DerivedKeysUI
-import DerivedKeysUIKit
 import UIKit
 
 @MainActor

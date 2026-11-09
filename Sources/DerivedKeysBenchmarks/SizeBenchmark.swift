@@ -21,18 +21,20 @@ enum SizeBenchmarks {
             counts.right += 1
             return calculate(input, proposal: proposal)
         }
+        let leftSizing = left.bound(to: \SizeBenchmarkRoot.left)
+        let rightSizing = right.bound(to: \SizeBenchmarkRoot.right)
         let parent = SizeCache<SizeBenchmarkRoot>(
             dependingOn: \.spacing,
             \.horizontal,
-            children: left.at(\.left),
-            right.at(\.right),
+            children: leftSizing,
+            rightSizing,
             capacity: capacity
         ) { input, proposal in
             counts.parent += 1
             return compose(
                 input,
-                left: left.size(of: input.left, toFit: proposal),
-                right: right.size(of: input.right, toFit: proposal)
+                left: leftSizing.size(of: input, toFit: proposal),
+                right: rightSizing.size(of: input, toFit: proposal)
             )
         }
         let proposal = CGSize(width: 320, height: 240)

@@ -81,7 +81,11 @@ struct SizeCacheTests {
             childCalls += 1
             return CGSize(width: size.width, height: CGFloat(root.text.count))
         }
-        let parent = SizeCache<SizeTestPanel>(dependingOn: \.spacing, children: child.at(\.first), capacity: 4) {
+        let parent = SizeCache<SizeTestPanel>(
+            dependingOn: \.spacing,
+            children: child.bound(to: \SizeTestPanel.first),
+            capacity: 4
+        ) {
             root,
             size in
             parentCalls += 1
@@ -182,8 +186,8 @@ struct SizeCacheTests {
             return CGSize(width: root.value, height: 1)
         }
         let parent = SizeCache<SizeTestPanel>(
-            children: leaf.at(\.first),
-            leaf.at(\.second),
+            children: leaf.bound(to: \SizeTestPanel.first),
+            leaf.bound(to: \SizeTestPanel.second),
             capacity: 4
         ) { root, proposal in
             parentCalls += 1
@@ -232,8 +236,8 @@ struct SizeCacheTests {
         let middle = SizeCache<SizeTestPanel>(
             dependingOn: \.spacing,
             children: direct,
-            leaf.at(\.first),
-            leaf.at(\.second),
+            leaf.bound(to: \SizeTestPanel.first),
+            leaf.bound(to: \SizeTestPanel.second),
             capacity: 2
         ) { _, size in size }
         let top = SizeCache<SizeTestPanel>(children: middle, capacity: 2) { _, size in size }
@@ -245,7 +249,8 @@ struct SizeCacheTests {
         #expect(original != top.snapshot(of: root))
         #expect(root.first.reads == 2)
         #expect(root.second.reads == 2)
-        let repeated = SizeCache<SizeTestPanel>(children: leaf.at(\.first), leaf.at(\.first), capacity: 1) { _, size in
+        let first = leaf.bound(to: \SizeTestPanel.first)
+        let repeated = SizeCache<SizeTestPanel>(children: first, first, capacity: 1) { _, size in
             size
         }
         _ = repeated.snapshot(of: root)
@@ -387,7 +392,7 @@ struct SizeCacheTests {
         #expect(cache.count == 0)
     }
 
-    @Test func rootsAreReleasedAndDescriptionsDoNotRetainChildCacheOrRecipe() {
+    @Test func rootsAreReleasedAndOnlyBindingsRetainTheirCacheAndRecipe() {
         let cache = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 2) { root, _ in
             CGSize(width: root.value, height: 1)
         }
@@ -405,13 +410,15 @@ struct SizeCacheTests {
             CGSize(width: token?.value ?? 0, height: 1)
         }
         weak let weakChild = child
-        let mapped = child!.at(\SizeTestPanel.first)
-        let parent = SizeCache<SizeTestPanel>(children: child!.at(\.first), capacity: 1) { _, size in size }
+        var binding: SizeCacheBinding<SizeTestPanel>? = child!.bound(to: \SizeTestPanel.first)
+        let parent = SizeCache<SizeTestPanel>(children: binding!, capacity: 1) { _, size in size }
         child = nil
         token = nil
+        #expect(weakChild != nil)
+        #expect(weakToken != nil)
+        binding = nil
         #expect(weakChild == nil)
         #expect(weakToken == nil)
-        #expect(mapped.snapshot(of: SizeTestPanel()) != parent.snapshot(of: SizeTestPanel()))
         #expect(parent.size(of: SizeTestPanel(), toFit: bounds) == bounds)
     }
 
@@ -428,15 +435,93 @@ struct SizeCacheTests {
         #expect(weakOwner == nil)
     }
 
-    @Test func maximumDepthCanBeConstructedAndMappingPreservesIt() {
-        var description: SizeDependencies<SizeTestItem> = SizeCache<SizeTestItem>(capacity: 0) { _, size in size }
+    @Test func maximumDepthCanBeConstructedAndBindingPreservesIt() {
+        var cache = SizeCache<SizeTestItem>(capacity: 0) { _, size in size }
         for _ in 1 ..< SizeDependencies<SizeTestItem>.maximumDepth {
-            description = SizeCache<SizeTestItem>(children: description, capacity: 0) { _, size in size }
+            cache = SizeCache<SizeTestItem>(children: cache, capacity: 0) { _, size in size }
         }
         #expect(
-            description.snapshot(of: SizeTestItem(1))
-                == description.at(\SizeTestPanel.first).snapshot(of: SizeTestPanel())
+            cache.snapshot(of: SizeTestItem(1))
+                == cache.bound(to: \SizeTestPanel.first).snapshot(of: SizeTestPanel())
         )
+    }
+
+    @Test func infiniteAxesShareTheUnconstrainedEntryAndReachTheRecipeAsGreatestFinite() {
+        let maximum = CGFloat.greatestFiniteMagnitude
+        var received: [CGSize] = []
+        let cache = SizeCache<SizeTestPanel>(capacity: 8) { _, proposal in
+            received.append(proposal)
+            return proposal
+        }
+        let root = SizeTestPanel()
+        _ = cache.size(of: root, toFit: CGSize(width: maximum, height: 80))
+        _ = cache.size(of: root, toFit: CGSize(width: CGFloat.infinity, height: 80))
+        _ = cache.size(of: root, toFit: CGSize(width: 40, height: maximum))
+        _ = cache.size(of: root, toFit: CGSize(width: 40, height: CGFloat.infinity))
+        _ = cache.size(of: root, toFit: CGSize(width: maximum, height: maximum))
+        _ = cache.size(of: root, toFit: CGSize(width: CGFloat.infinity, height: CGFloat.infinity))
+        #expect(
+            received == [
+                CGSize(width: maximum, height: 80), CGSize(width: 40, height: maximum),
+                CGSize(width: maximum, height: maximum),
+            ]
+        )
+        #expect(cache.count == 3)
+        cache.removeSize(of: root, toFit: CGSize(width: CGFloat.infinity, height: CGFloat.infinity))
+        #expect(cache.count == 2)
+    }
+
+    @Test func declaredChildrenPassTheDebugCheckThroughChainedBindingsAndNestedParents() {
+        let leaf = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 4) { root, _ in
+            CGSize(width: root.value, height: 1)
+        }
+        let panelSizing = leaf.bound(to: \SizeTestPanel.first)
+        let envelopeSizing = panelSizing.bound(to: \SizeTestEnvelope.panel)
+        let middle = SizeCache<SizeTestPanel>(children: panelSizing, capacity: 4) { root, proposal in
+            panelSizing.size(of: root, toFit: proposal)
+        }
+        let middleSizing = middle.bound(to: \SizeTestEnvelope.panel)
+        let chained = SizeCache<SizeTestEnvelope>(children: envelopeSizing, capacity: 4) { root, proposal in
+            envelopeSizing.size(of: root, toFit: proposal)
+        }
+        let top = SizeCache<SizeTestEnvelope>(children: middleSizing, capacity: 4) { root, proposal in
+            middleSizing.size(of: root, toFit: proposal)
+        }
+        let root = SizeTestEnvelope()
+        #expect(chained.size(of: root, toFit: bounds).width == 1)
+        #expect(top.size(of: root, toFit: bounds).width == 1)
+        #expect(leaf.count == 1)
+    }
+
+    @Test func optingOutPermitsMeasuringAnUndeclaredCache() {
+        let fixed = SizeCache<SizeTestItem>(capacity: 2) { _, _ in CGSize(width: 9, height: 9) }
+        let captured = SizeTestItem()
+        let parent = SizeCache<SizeTestPanel>(capacity: 2, allowsUndeclaredMeasurements: true) { _, proposal in
+            fixed.size(of: captured, toFit: proposal)
+        }
+        #expect(parent.size(of: SizeTestPanel(), toFit: bounds) == CGSize(width: 9, height: 9))
+    }
+
+    @Test func transitivelyDeclaredGrandchildrenPassTheDebugCheck() {
+        let leaf = SizeCache<SizeTestItem>(dependingOn: \.value, capacity: 4) { root, _ in
+            CGSize(width: root.value, height: 1)
+        }
+        let panelSizing = leaf.bound(to: \SizeTestPanel.first)
+        let middle = SizeCache<SizeTestPanel>(children: panelSizing, capacity: 4) { _, proposal in proposal }
+        let envelopeSizing = panelSizing.bound(to: \SizeTestEnvelope.panel)
+        let direct = SizeCache<SizeTestEnvelope>(children: middle.bound(to: \.panel), capacity: 4) { root, proposal in
+            leaf.size(of: root.panel.first, toFit: proposal)
+        }
+        let nested = SizeCache<SizeTestEnvelope>(children: middle.bound(to: \.panel), capacity: 4) { root, proposal in
+            panelSizing.size(of: root.panel, toFit: proposal)
+        }
+        let chained = SizeCache<SizeTestEnvelope>(children: middle.bound(to: \.panel), capacity: 4) { root, proposal in
+            envelopeSizing.size(of: root, toFit: proposal)
+        }
+        let root = SizeTestEnvelope()
+        #expect(direct.size(of: root, toFit: bounds).width == 1)
+        #expect(nested.size(of: root, toFit: bounds).width == 1)
+        #expect(chained.size(of: root, toFit: bounds).width == 1)
     }
 
     private var bounds: CGSize { CGSize(width: 100, height: 80) }
@@ -463,6 +548,11 @@ final class SizeTestPanel {
     var spacing = 4
     var padding = 4
     var enabled = true
+}
+
+@MainActor
+final class SizeTestEnvelope {
+    let panel = SizeTestPanel()
 }
 
 struct SizeTestCollision: Hashable {

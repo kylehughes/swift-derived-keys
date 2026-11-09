@@ -1,5 +1,5 @@
 import CoreGraphics
-import DerivedKeysUIKit
+import DerivedKeysUI
 import Testing
 
 struct FittingProposalTests {
@@ -31,7 +31,7 @@ struct FittingProposalTests {
         #expect(try FittingDimension(points: .greatestFiniteMagnitude).limit == .greatestFiniteMagnitude)
     }
 
-    @Test(arguments: [CGFloat.nan, .infinity, -.infinity, -1])
+    @Test(arguments: [CGFloat.nan, -CGFloat.infinity, -1])
     func fittingBridgeRejectsInvalidAxes(points: CGFloat) {
         #expect(throws: FittingProposalError.invalidDimension) {
             try FittingProposal(fitting: CGSize(width: points, height: 12))
@@ -39,6 +39,21 @@ struct FittingProposalTests {
         #expect(throws: FittingProposalError.invalidDimension) {
             try FittingProposal(fitting: CGSize(width: 12, height: points))
         }
+    }
+
+    @Test func fittingBridgeMapsPositiveInfinityToUnconstrainedOnEachAxis() throws {
+        let width = try FittingProposal(fitting: CGSize(width: CGFloat.infinity, height: 30))
+        #expect(width.width == .unconstrained)
+        #expect(width.height.limit == 30)
+        let height = try FittingProposal(fitting: CGSize(width: 40, height: CGFloat.infinity))
+        #expect(height.width.limit == 40)
+        #expect(height.height == .unconstrained)
+        let both = try FittingProposal(fitting: CGSize(width: CGFloat.infinity, height: CGFloat.infinity))
+        #expect(both == FittingProposal(width: .unconstrained))
+        #expect(both == (try FittingProposal(fitting: both.fittingSize)))
+        #expect(
+            both.fittingSize == CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        )
     }
 
     @Test func fittingBridgePreservesFiniteSizesAndZero() throws {

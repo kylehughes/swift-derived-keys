@@ -1,4 +1,4 @@
-import DerivedKeysUIKit
+import DerivedKeysUI
 
 @MainActor
 func validLayoutAccess() throws {
