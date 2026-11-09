@@ -22,12 +22,6 @@ struct DependencySnapshotTests {
         }
     }
 
-    private struct ArrayProvider: KeyValueProvider {
-        func value(for input: [TrackedValue]) -> [TrackedValue] {
-            input
-        }
-    }
-
     private struct Collision: Hashable {
         let value: Int
 
@@ -75,6 +69,62 @@ struct DependencySnapshotTests {
         #expect(try DependencySnapshot(children: [first]) != DependencySnapshot(children: [second]))
     }
 
+    @Test func equalValuesOfDifferentConcreteTypesAreUnequal() throws {
+        #expect(DependencySnapshot(value: 1 as Int) != DependencySnapshot(value: 1 as Int8))
+        #expect(DependencySnapshot(value: [1] as [Int]) != DependencySnapshot(value: [1] as [Int8]))
+        #expect(
+            DependencySnapshot(value: "abc") != DependencySnapshot(value: Substring("abc"))
+        )
+        #expect(
+            DependencySnapshot(value: [1] as [Int]) != DependencySnapshot(value: [1] as Set<Int>)
+        )
+        #expect(
+            try DependencySnapshot(children: [DependencySnapshot(value: 1 as Int)])
+                != DependencySnapshot(children: [DependencySnapshot(value: 1 as Int8)])
+        )
+        #expect(
+            KeySource<Void>("a", value: 1 as Int).snapshot(for: ())
+                != KeySource<Void>("a", value: 1 as Int8).snapshot(for: ())
+        )
+    }
+
+    @Test func collidingLeafHashesStayDistinct() {
+        let snapshots = (0 ..< 32).map { DependencySnapshot(value: Collision(value: $0)) }
+        #expect(Set(snapshots).count == snapshots.count)
+        #expect(DependencySnapshot(value: Collision(value: 7)) == snapshots[7])
+        #expect(DependencySnapshot(value: Collision(value: 7)).hashValue == snapshots[7].hashValue)
+        #expect(snapshots[0] != snapshots[1])
+    }
+
+    @Test func snapshotsAndCopiesCompareEqualWithoutInspectingValues() {
+        let operations = ValueOperations()
+        let snapshot = DependencySnapshot(value: TrackedValue(value: 1, operations: operations))
+        let copy = snapshot
+        #expect(snapshot == snapshot)
+        #expect(snapshot == copy)
+        #expect(operations.equalityCalls == 0)
+        let separate = DependencySnapshot(value: TrackedValue(value: 1, operations: operations))
+        #expect(snapshot == separate)
+        #expect(operations.equalityCalls > 0)
+    }
+
+    @Test func directSnapshotsEqualSourceProducedSnapshots() throws {
+        #expect(DependencySnapshot(value: "text") == KeySource<Void>("", value: "text").snapshot(for: ()))
+        #expect(
+            DependencySnapshot(value: 3) == KeySource<Int>("", provider: { $0 }).snapshot(for: 3)
+        )
+        let direct = try DependencySnapshot(children: [
+            DependencySnapshot(value: 1), DependencySnapshot(value: "two"),
+        ])
+        let source = try KeySource<Void>(
+            "",
+            children: [KeySource("", value: 1), KeySource("", value: "two")]
+        )
+        #expect(direct == source.snapshot(for: ()))
+        #expect(direct.hashValue == source.snapshot(for: ()).hashValue)
+        #expect(try direct != KeySource<Void>("label", children: []).snapshot(for: ()))
+    }
+
     @Test func arraySnapshotsRetainConcreteEqualityAndHashing() {
         let operations = ValueOperations()
         let values = [1, 2, 3].map { TrackedValue(value: $0, operations: operations) }
@@ -83,7 +133,7 @@ struct DependencySnapshotTests {
             DependencySnapshot(value: values),
             KeySource<Void>("", value: values).snapshot(for: ()),
             KeySource<[TrackedValue]>("", provider: { $0 }).snapshot(for: values),
-            KeySource<[TrackedValue]>("", provider: ArrayProvider()).snapshot(for: values),
+            KeySource<Void>("", provider: { values }).snapshot(for: ()),
         ]
 
         for equivalent in equivalentSnapshots {

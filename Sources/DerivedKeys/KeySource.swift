@@ -1,28 +1,25 @@
-/// An immutable recipe for evaluating a heterogeneous dependency graph.
+/// An immutable description of how to read a heterogeneous set of dependencies from an input.
 ///
-/// Sources are not Hashable. Evaluate them into ``DependencySnapshot`` before a
-/// dictionary lookup. Independent graphs with equal labels, concrete value types,
-/// structure, and captured values produce equal snapshots; node identity is used
-/// only to capture each shared leaf once per evaluation.
+/// A source is not `Hashable`: evaluate it into a ``DependencySnapshot`` before a dictionary
+/// lookup. Independent graphs with equal labels, concrete value types, structure, and captured
+/// values produce equal snapshots. Node identity is used only to evaluate each shared node once
+/// per call to ``snapshot(for:)``.
 ///
-/// Prefer immutable explicit inputs. Providers are synchronous nonisolated reads;
-/// they must not mutate inputs, perform I/O, or recursively evaluate the graph.
-/// Use a ``KeyValueProvider`` for live non-Sendable state. Closure convenience
-/// providers are Sendable so they cannot erase actor isolation. A source retains
-/// its provider for its lifetime. Capture actor state outside the provider
-/// and pass the resulting snapshot as input. Input and returned value types need
-/// not be Sendable.
+/// Providers are ordinary closures that run synchronously and must be side-effect-free reads;
+/// see <doc:DependencyDesign>. A source retains its providers. It is not `Sendable`, so Swift 6
+/// region isolation confines a source built from actor-isolated closures to that actor. Input
+/// and value types need not be `Sendable`.
 public struct KeySource<Input> {
     /// The largest supported number of nodes on a root-to-leaf path.
     ///
-    /// This bound protects recursive evaluation, equality, hashing, and teardown.
+    /// The bound keeps recursive evaluation, equality, hashing, and teardown safe.
     public static var maximumDepth: Int {
         DependencySnapshot.maximumDepth
     }
 
     private let node: Node
 
-    /// Creates an original source from an immutable value.
+    /// Creates a source for one labeled immutable value.
     public init<Value>(_ label: String, value: Value) where Value: Hashable {
         node = Node(
             label: label,
@@ -33,11 +30,11 @@ public struct KeySource<Input> {
         )
     }
 
-    /// Creates an original source whose provider runs on each evaluation.
+    /// Creates a source whose provider closure runs on each evaluation.
     ///
-    /// Each shared source is read once per evaluation. The returned value
-    /// must be an immutable snapshot, not a mutable reference used for hashing.
-    public init<Value>(_ label: String, provider: @escaping @Sendable (Input) -> Value) where Value: Hashable {
+    /// A shared source is read once per evaluation. The returned value must be an immutable
+    /// snapshot, not a mutable reference.
+    public init<Value>(_ label: String, provider: @escaping (Input) -> Value) where Value: Hashable {
         node = Node(
             label: label,
             kind: .original { input in
@@ -47,26 +44,11 @@ public struct KeySource<Input> {
         )
     }
 
-    /// Creates an original source from a nonisolated, possibly non-Sendable reader.
+    /// Creates a labeled, ordered composition of sources in one pass.
     ///
-    /// The source retains the provider, but evaluated snapshots do not. Keep
-    /// provider-owned mutable state within one owner and return immutable values.
-    public init<Provider>(_ label: String, provider: Provider)
-    where Provider: KeyValueProvider, Provider.Input == Input {
-        node = Node(
-            label: label,
-            kind: .original { input in
-                DependencySnapshot(label: label, value: provider.value(for: input))
-            },
-            depth: 1
-        )
-    }
-
-    /// Creates a derived source from an ordered collection in one pass.
-    ///
-    /// Empty compositions are valid. Children retain their boundaries and labels.
+    /// An empty composition is valid. Children keep their boundaries and labels.
     /// - Throws: ``ConstructionError/maximumDepthExceeded`` for a path longer than
-    ///   ``maximumDepth``. Immutable construction cannot introduce graph cycles.
+    ///   ``maximumDepth``.
     /// - Complexity: O(n) in the number of immediate children.
     public init(_ label: String, children: [Self]) throws {
         var nodes: [Node] = []
@@ -83,10 +65,10 @@ public struct KeySource<Input> {
         node = Node(label: label, kind: .derived(nodes), depth: depth)
     }
 
-    /// Returns a derived composition with one more ordered child.
+    /// Returns this composition with one more child at the end.
     ///
-    /// The original composition is unchanged. Use ``init(_:children:)`` to build
-    /// a large list; repeated appends copy that list and can cost O(n²) overall.
+    /// The original is unchanged. Build a large list with ``init(_:children:)`` instead;
+    /// repeated appends copy the list and can cost O(n²) overall.
     /// - Throws: ``ConstructionError/notDerived`` for an original source, or
     ///   ``ConstructionError/maximumDepthExceeded`` for an unsupported depth.
     public func appending(_ child: Self) throws -> Self {
@@ -97,12 +79,13 @@ public struct KeySource<Input> {
         return try Self(node.label, children: children.map { Self(node: $0) } + [child])
     }
 
-    /// Evaluates the source graph against `input`, reading each shared node at most once.
+    /// Reads the dependencies from `input` into a snapshot.
     ///
-    /// Shared-node memoization applies only within a single `snapshot(for:)` call.
-    /// Later calls reevaluate providers; already-created snapshots never run providers again.
-    /// Reading separate mutable properties one by one is not atomic, so callers must
-    /// keep all input state consistent across the complete request.
+    /// Each shared node is read at most once per call. Later calls read again, and an existing
+    /// snapshot never runs a provider again. Reads are not atomic, so keep the input state
+    /// consistent for the whole request.
+    /// - Parameter input: The captured input to read.
+    /// - Returns: The values and structure of the graph.
     /// - Complexity: O(v + e) visits for v nodes and e edges, plus provider work.
     ///   Result equality and hashing inspect values and repeated child occurrences.
     public func snapshot(for input: Input) -> DependencySnapshot {
@@ -116,7 +99,7 @@ public struct KeySource<Input> {
 }
 
 extension KeySource {
-    /// An invalid composition request.
+    /// An error from composing a source.
     public enum ConstructionError: Error, Equatable {
         /// The new graph would exceed the supported depth.
         case maximumDepthExceeded

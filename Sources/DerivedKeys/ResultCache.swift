@@ -1,47 +1,51 @@
-/// A bounded, value-semantic cache configured with selected inputs and one computation.
+/// A bounded cache that reuses a recipe's result for equal selected values.
 ///
-/// Only the selected key-path values determine reuse. The computation must produce
-/// interchangeable results whenever those values are equal; any other inputs it reads
-/// must stay fixed for the cache's lifetime. Use `\.self` to select a complete hashable
-/// input, or named tuple members to combine inputs. No dependencies means one shared key.
+/// Only the selected key-path values determine reuse, so the recipe must return interchangeable
+/// results whenever they match. Use `\.self` to select a whole hashable input, or pass a named
+/// tuple to combine several inputs. Passing no key paths gives every request the same key. See
+/// <doc:DependencyDesign> for choosing complete, stable selections.
 ///
-/// Selected values retain their complete concrete values and types. Their equality and
-/// hashing must remain stable while cached; project immutable values from mutable aliases.
-/// Entries do not implicitly retain inputs, but reference-valued dependencies and results
-/// can retain them. The cache retains its configured computation and its captures.
-///
-/// Copies mutate their entries independently without deep-copying captured references.
-/// This type is not Sendable and provides no shared synchronization. Reentering the same
-/// cache during computation is unsupported because mutation requires exclusive access.
+/// The cache is a value type: copies mutate their entries independently without deep-copying
+/// captured references. It retains its recipe and key-path readers, while entries retain only
+/// selected values and results, not inputs. It is not `Sendable` and provides no shared
+/// synchronization. Reentering the same cache while its recipe is running is unsupported.
 public struct ResultCache<Input, Value> {
-    private let compute: (Input) -> Value
-    private let readers: [(Input) -> DependencySnapshot]
-    private var storage: MemoizationCache<[DependencySnapshot], Value>
+    @usableFromInline
+    let compute: (Input) -> Value
+    @usableFromInline
+    let readers: [(Input) -> DependencySnapshot]
+    @usableFromInline
+    var storage: MemoizationCache<[DependencySnapshot], Value>
 
-    /// The maximum number of entries, rather than a limit on retained bytes.
+    /// The maximum number of entries.
+    ///
+    /// Capacity limits entries, not retained bytes.
+    @inlinable
     public var capacity: Int { storage.capacity }
 
-    /// The number of currently stored entries.
+    /// The number of stored entries.
+    @inlinable
     public var count: Int { storage.count }
 
-    /// Creates an empty cache with a fixed dependency selection and computation.
+    /// Creates an empty cache that keys selected values and runs a recipe on a miss.
     ///
-    /// Inputs and results need not be Hashable or Sendable. Sendable key paths and
-    /// computation prevent implicit access to actor-isolated state; they do not require
-    /// the selected values themselves to be Sendable or assert computation purity.
+    /// Key paths and the recipe are ordinary non-`Sendable` closures, and inputs, selected
+    /// values, and results need not be `Sendable`. Swift 6 region isolation confines a cache
+    /// built from actor-isolated key paths or closures to that actor, so a main-actor type can
+    /// own one directly.
     ///
     /// - Parameters:
-    ///   - paths: The ordered values that fully determine result reuse.
+    ///   - paths: Key paths to the ordered values that determine result reuse.
     ///   - capacity: The maximum number of entries. Zero disables storage.
-    ///   - compute: The synchronous computation invoked once on each miss.
+    ///   - compute: The synchronous recipe, called once on each miss.
     /// - Precondition: `capacity` is nonnegative.
     public init<each Dependency>(
-        dependingOn paths: repeat (KeyPath<Input, each Dependency> & Sendable),
+        dependingOn paths: repeat KeyPath<Input, each Dependency>,
         capacity: Int,
-        compute: @escaping @Sendable (Input) -> Value
+        compute: @escaping (Input) -> Value
     ) where repeat each Dependency: Hashable {
         var readers: [(Input) -> DependencySnapshot] = []
-        func append<SelectedValue>(_ path: KeyPath<Input, SelectedValue> & Sendable)
+        func append<SelectedValue>(_ path: KeyPath<Input, SelectedValue>)
         where SelectedValue: Hashable {
             readers.append { input in DependencySnapshot(value: input[keyPath: path]) }
         }
@@ -51,31 +55,36 @@ public struct ResultCache<Input, Value> {
         storage = MemoizationCache(capacity: capacity)
     }
 
-    /// Removes all entries, releasing their keys and values while retaining configuration.
+    /// Removes all entries, keeping the key paths and recipe.
+    @inlinable
     public mutating func removeAll() {
         storage.removeAll()
     }
 
-    /// Removes the entry matching the input's current selected values, if present.
+    /// Removes the entry for the input's current selected values, if present.
     ///
-    /// This reads each selected value once and never invokes the computation.
+    /// This reads each selected value once and never runs the recipe.
+    /// - Parameter input: The input whose current selected values identify the entry.
     /// - Complexity: Dependency capture, hashing, and equality work plus expected
     ///   amortized O(1) bookkeeping; the first mutation after a copy may be O(n).
+    @inlinable
     public mutating func removeValue(for input: Input) {
         storage.removeValue(for: readers.map { $0(input) })
     }
 
-    /// Returns the cached result or computes and stores a result on a miss.
+    /// Returns the cached result for the input's selected values, running the recipe on a miss.
     ///
-    /// Each selected value is read once before lookup. A miss passes the same input to
-    /// the computation. Callers must keep reference-backed inputs consistent throughout
-    /// the call. Hits and insertions become most recently used; insertion at capacity
-    /// evicts the least recently used entry. Optional `nil` results are real hits.
-    /// At zero capacity every call computes without storing a result.
+    /// A lookup reads each selected value once in order and, on a miss, passes the same input to
+    /// the recipe. Hits and insertions become most recently used, and an insertion at capacity
+    /// evicts the least recently used entry. An optional `nil` result is cached as a hit. At zero
+    /// capacity, every call runs the recipe without storing.
     ///
+    /// - Parameter input: The input to read and, on a miss, pass to the recipe.
+    /// - Returns: The retained result on a hit, or the recipe's result on a miss.
     /// - Complexity: Dependency capture, hashing, and equality work plus expected
-    ///   amortized O(1) bookkeeping and computation on a miss. The first mutation after
+    ///   amortized O(1) bookkeeping and the recipe on a miss. The first mutation after
     ///   a copy may be O(n) in the number of allocated entries.
+    @inlinable
     public mutating func value(for input: Input) -> Value {
         let key = readers.map { $0(input) }
         let compute = compute

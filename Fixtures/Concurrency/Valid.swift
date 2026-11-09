@@ -18,7 +18,7 @@ func confinedNonSendableValues() {
     let request = RequestKey<Operation, LocalValue, LocalValue>(dependencies: local, context: local)
     var cache = MemoizationCache<RequestKey<Operation, LocalValue, LocalValue>, LocalValue>(capacity: 2)
     _ = cache.value(for: request) { local }
-    let source = KeySource<LocalValue>("local", provider: LocalValueProvider())
+    let source = KeySource<LocalValue>("local", provider: { $0 })
     let snapshot = source.snapshot(for: local)
     _ = [snapshot: derived]
     let projection = KeyProjection(operation: Operation.self) { (input: LocalValue) in input }
@@ -47,15 +47,14 @@ actor Receiver {
     _ = key.hashValue
 }
 
-func confinedLiveProvider() {
+func confinedLiveState() {
     let owner = LocalOwner()
-    let provider = LocalLiveProvider(owner: owner)
-    let source = KeySource<Int>("live", provider: provider)
-    let projection = KeyProjection(operation: Operation.self, provider: provider)
+    let source = KeySource<Int>("live", provider: { owner.value + $0 })
+    let projection = KeyProjection(operation: Operation.self) { (input: Int) in owner.value + input }
     owner.value = 2
     _ = source.snapshot(for: 1)
     _ = projection.key(for: 1, context: "en")
-    _ = KeySource<LocalOwner>("nonhashable-input", provider: LocalInputProvider()).snapshot(for: owner)
-    let valueProjection = KeyProjection(operation: Operation.self, provider: LocalValueProvider())
+    _ = KeySource<LocalOwner>("nonhashable-input", provider: { $0.value }).snapshot(for: owner)
+    let valueProjection = KeyProjection(operation: Operation.self) { (input: LocalValue) in input }
     _ = valueProjection.key(for: LocalValue(1), context: "en")
 }

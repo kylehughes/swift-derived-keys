@@ -21,19 +21,3 @@ func requireSendable<T: Sendable>(_ value: T) {}
 final class LocalOwner {
     var value = 1
 }
-
-struct LocalLiveProvider: KeyValueProvider {
-    let owner: LocalOwner
-
-    func value(for input: Int) -> Int {
-        owner.value + input
-    }
-}
-
-struct LocalValueProvider: KeyValueProvider {
-    func value(for input: LocalValue) -> LocalValue { input }
-}
-
-struct LocalInputProvider: KeyValueProvider {
-    func value(for input: LocalOwner) -> Int { input.value }
-}

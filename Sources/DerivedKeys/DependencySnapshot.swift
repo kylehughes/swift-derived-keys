@@ -1,37 +1,39 @@
-/// Captured heterogeneous values with structural equality.
+/// Heterogeneous values captured for one request, compared by value and structure.
 ///
-/// Snapshots contain complete values and structure, never provider closures or
-/// source graph nodes. Equality preserves concrete value types, labels, child
-/// order, multiplicity, and nesting. Captured values must have stable equality and
-/// hashing; mutable references require an explicit immutable projection.
-/// The erased representation has no Sendable conformance. Prefer typed keys
-/// for transferable values.
+/// A snapshot holds complete values and their structure, never provider closures or source
+/// graph nodes. Equality compares concrete value types, labels, child order, multiplicity,
+/// and nesting. Captured values must keep stable equality and hashing, so project mutable
+/// references into immutable values first; see <doc:DependencyDesign>.
+///
+/// A snapshot is not `Sendable`. Prefer typed keys for values that cross isolation boundaries.
 public struct DependencySnapshot: Hashable {
     /// The largest supported number of nodes on a root-to-leaf path.
     ///
-    /// This bound protects recursive equality, hashing, and teardown.
+    /// The bound keeps recursive equality, hashing, and teardown safe.
     public static var maximumDepth: Int {
         64
     }
 
     let depth: Int
+    @usableFromInline
     let node: Node
 
-    /// Creates a snapshot retaining a complete value and its concrete type.
+    /// Creates a snapshot of one value, keeping its concrete type.
     ///
-    /// The snapshot has an empty label and equals an equivalent empty-label
-    /// ``KeySource`` snapshot. Values must preserve their equality and hashing
-    /// through any mutable aliases; this initializer does not deep-copy them.
+    /// The snapshot has an empty label and equals an equivalent empty-label ``KeySource``
+    /// snapshot. The value is not deep-copied, so it must keep stable equality and hashing.
+    @inlinable
     public init<Value>(value: Value) where Value: Hashable {
         self.init(label: "", value: value)
     }
 
-    /// Creates an ordered composition, preserving each child's boundary.
+    /// Creates an ordered composition of snapshots, keeping each child's boundary.
     ///
-    /// Empty compositions are valid and have depth one. The composition has an
-    /// empty label and equals an equivalent empty-label ``KeySource`` snapshot.
+    /// An empty composition is valid. The composition has an empty label and equals an
+    /// equivalent empty-label ``KeySource`` snapshot.
+    /// - Parameter children: The snapshots to compose, in order.
     /// - Throws: ``ConstructionError/maximumDepthExceeded`` for a path longer than
-    ///   ``maximumDepth``. Immutable construction cannot introduce cycles.
+    ///   ``maximumDepth``.
     /// - Complexity: O(n) in the number of immediate children.
     public init(children: [Self]) throws {
         self.init(node: .derived(label: "", children: children))
@@ -40,16 +42,12 @@ public struct DependencySnapshot: Hashable {
         }
     }
 
+    @inlinable
     init<Value>(label: String, value: Value) where Value: Hashable {
-        self.init(
-            node: .original(
-                label: label,
-                type: ObjectIdentifier(Value.self),
-                value: AnyHashable(ConcreteValue(value: value))
-            )
-        )
+        self.init(node: .original(label: label, value: ConcreteBox(value)))
     }
 
+    @usableFromInline
     init(node: Node) {
         self.node = node
         switch node {
@@ -59,10 +57,20 @@ public struct DependencySnapshot: Hashable {
             depth = children.reduce(1) { max($0, $1.depth + 1) }
         }
     }
+
+    /// Returns whether both snapshots hold equal values and structure, including concrete types.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.node == rhs.node
+    }
+
+    /// Hashes the components that equality compares.
+    public func hash(into hasher: inout Hasher) {
+        node.hash(into: &hasher)
+    }
 }
 
 extension DependencySnapshot {
-    /// An invalid snapshot composition request.
+    /// An error from composing a snapshot.
     public enum ConstructionError: Error, Equatable {
         /// The new composition would exceed the supported depth.
         case maximumDepthExceeded
@@ -70,14 +78,79 @@ extension DependencySnapshot {
 }
 
 extension DependencySnapshot {
-    // Erase the wrapper so AnyHashable preserves Value's concrete Hashable
-    // operations instead of applying collection element erasure or bridging.
-    private struct ConcreteValue<Value>: Hashable where Value: Hashable {
-        let value: Value
+    // A class box preserves Value's concrete Hashable operations without the
+    // element erasure or bridging that AnyHashable applies to collections.
+    @usableFromInline
+    class ErasedBox {
+        @usableFromInline
+        init() {}
+
+        @usableFromInline
+        func isEqual(to other: ErasedBox) -> Bool {
+            fatalError("Subclasses must override isEqual(to:).")
+        }
+
+        @usableFromInline
+        func hash(into hasher: inout Hasher) {
+            fatalError("Subclasses must override hash(into:).")
+        }
     }
 
-    indirect enum Node: Hashable {
-        case original(label: String, type: ObjectIdentifier, value: AnyHashable)
+    @usableFromInline
+    final class ConcreteBox<Value>: ErasedBox where Value: Hashable {
+        @usableFromInline
+        let value: Value
+
+        @inlinable
+        init(_ value: Value) {
+            self.value = value
+        }
+
+        @inlinable
+        override func isEqual(to other: ErasedBox) -> Bool {
+            guard ObjectIdentifier(type(of: self)) == ObjectIdentifier(type(of: other)) else {
+                return false
+            }
+
+            return value == unsafeDowncast(other, to: ConcreteBox<Value>.self).value
+        }
+
+        @inlinable
+        override func hash(into hasher: inout Hasher) {
+            hasher.combine(ObjectIdentifier(type(of: self)))
+            hasher.combine(value)
+        }
+    }
+
+    @usableFromInline
+    enum Node: Hashable {
+        case original(label: String, value: ErasedBox)
         case derived(label: String, children: [DependencySnapshot])
+
+        @usableFromInline
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            switch (lhs, rhs) {
+            case (.original(let leftLabel, let leftValue), .original(let rightLabel, let rightValue)):
+                return leftLabel == rightLabel && (leftValue === rightValue || leftValue.isEqual(to: rightValue))
+            case (.derived(let leftLabel, let leftChildren), .derived(let rightLabel, let rightChildren)):
+                return leftLabel == rightLabel && leftChildren == rightChildren
+            default:
+                return false
+            }
+        }
+
+        @usableFromInline
+        func hash(into hasher: inout Hasher) {
+            switch self {
+            case .original(let label, let value):
+                hasher.combine(0 as UInt8)
+                hasher.combine(label)
+                value.hash(into: &hasher)
+            case .derived(let label, let children):
+                hasher.combine(1 as UInt8)
+                hasher.combine(label)
+                hasher.combine(children)
+            }
+        }
     }
 }

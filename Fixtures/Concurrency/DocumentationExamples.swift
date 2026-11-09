@@ -59,17 +59,9 @@ func documentationLiveProviderExample() {
         }
     }
 
-    struct DocumentTextProvider: KeyValueProvider {
-        let store: DocumentStore
-
-        nonisolated func value(for input: Void) -> String {
-            store.text
-        }
-    }
-
     func captureLiveText() {
         let store = DocumentStore(text: "Hello")
-        let source = KeySource<Void>("text", provider: DocumentTextProvider(store: store))
+        let source = KeySource<Void>("text", provider: { store.text })
         let first = source.snapshot(for: ())
         store.text = "Goodbye"
         let edited = source.snapshot(for: ())

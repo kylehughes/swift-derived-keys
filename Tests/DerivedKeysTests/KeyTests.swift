@@ -21,14 +21,10 @@ struct KeyTests {
     final class Owner {
         var reads = 0
         var value = "A"
-    }
 
-    struct LiveProvider: KeyValueProvider {
-        let owner: Owner
-
-        func value(for input: Void) -> String {
-            owner.reads += 1
-            return owner.value
+        func read() -> String {
+            reads += 1
+            return value
         }
     }
 
@@ -65,7 +61,7 @@ struct KeyTests {
         #expect(source.snapshot(for: Model(text: "B", selection: 1)) != original)
 
         let owner = Owner()
-        let projection = KeyProjection(operation: Export.self, provider: LiveProvider(owner: owner))
+        let projection = KeyProjection(operation: Export.self) { (_: Void) in owner.read() }
         let first = projection.key(for: (), context: 0)
         owner.value = "B"
         let second = projection.key(for: (), context: 0)
@@ -169,7 +165,7 @@ struct KeyTests {
 
     @Test func sharedProviderIsReadOncePerEvaluationAndSnapshotsStayStable() throws {
         let owner = Owner()
-        let shared = KeySource<Void>("text", provider: LiveProvider(owner: owner))
+        let shared = KeySource<Void>("text", provider: { owner.read() })
         let graph = try KeySource<Void>("root", children: [shared, KeySource("nested", children: [shared])])
         let first = graph.snapshot(for: ())
         #expect(owner.reads == 1)
@@ -188,7 +184,7 @@ struct KeyTests {
         do {
             let owner = Owner()
             reference = owner
-            let source = KeySource<Void>("text", provider: LiveProvider(owner: owner))
+            let source = KeySource<Void>("text", provider: { owner.read() })
             retained = source.snapshot(for: ())
         }
         #expect(reference == nil)

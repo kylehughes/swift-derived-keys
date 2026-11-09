@@ -1,29 +1,33 @@
-/// A reusable selection of the inputs that affect one operation.
+/// A reusable projection from an input to the dependencies of one operation.
 ///
-/// Capture an input snapshot once, then use it for both projection and calculation.
-/// Projection is synchronous and runs when ``key(for:context:version:)`` is called.
-/// It must be a side-effect-free read and must not suspend or recursively evaluate
-/// itself. Actor-owned clients capture their state within that actor's isolation.
-/// The projection does not retain inputs after a call or require them to be Sendable.
+/// Capture an input once and pass that same value to both ``key(for:context:version:)`` and the
+/// calculation; see <doc:DependencyDesign>. The projection runs synchronously as a
+/// side-effect-free read and does not retain the inputs it reads.
+///
+/// `KeyProjection` is not `Sendable`, and inputs need not be `Sendable`. Swift 6 region
+/// isolation confines a projection built from an actor-isolated closure to that actor.
 public struct KeyProjection<Operation, Input, Dependencies> where Dependencies: Hashable {
-    private let project: (Input) -> Dependencies
+    @usableFromInline
+    let project: (Input) -> Dependencies
 
-    /// Creates a projection for a nominal operation type.
-    public init(operation: Operation.Type, project: @escaping @Sendable (Input) -> Dependencies) {
+    /// Creates a projection for an operation type.
+    /// - Parameters:
+    ///   - operation: The type that names the operation.
+    ///   - project: The synchronous function that selects the dependencies from an input.
+    public init(operation: Operation.Type, project: @escaping (Input) -> Dependencies) {
         self.project = project
     }
 
-    /// Creates a projection backed by a nonisolated reader without requiring Sendable state.
-    public init<Provider>(operation: Operation.Type, provider: Provider)
-    where Provider: KeyValueProvider, Provider.Input == Input, Provider.Value == Dependencies {
-        project = { input in
-            provider.value(for: input)
-        }
-    }
-
-    /// Evaluates the projection against an explicitly captured input.
+    /// Returns the request key for an input.
     ///
+    /// - Parameters:
+    ///   - input: The captured input to project.
+    ///   - context: The environment values the calculation reads.
+    ///   - version: The version that separates concurrently valid algorithms. The default of `0`
+    ///     suits a cache discarded on launch.
+    /// - Returns: A key scoped to the operation, version, dependencies, and context.
     /// - Complexity: The projection's cost, without hashing the resulting key.
+    @inlinable
     public func key<Context>(
         for input: Input,
         context: Context,

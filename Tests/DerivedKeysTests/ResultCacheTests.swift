@@ -172,6 +172,33 @@ extension ResultCacheTests {
         }
     }
 
+    @MainActor
+    private final class IsolatedModel {
+        var text = "Hello"
+        var width = 10
+        var computations = 0
+    }
+
+    @MainActor
+    @Test
+    func mainActorModelKeyPathsAndClosureStayInTheActorRegion() {
+        let model = IsolatedModel()
+        var cache = ResultCache<IsolatedModel, String>(dependingOn: \.text, \.width, capacity: 2) { input in
+            input.computations += 1
+            return "\(input.text):\(input.width)"
+        }
+        #expect(cache.value(for: model) == "Hello:10")
+        #expect(cache.value(for: model) == "Hello:10")
+        #expect(model.computations == 1)
+        model.width = 20
+        #expect(cache.value(for: model) == "Hello:20")
+        #expect(model.computations == 2)
+        model.width = 10
+        #expect(cache.value(for: model) == "Hello:10")
+        #expect(model.computations == 2)
+        #expect(cache.count == 2)
+    }
+
     private final class Token {
         let text: String
         init(_ text: String) { self.text = text }
