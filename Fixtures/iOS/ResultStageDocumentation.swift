@@ -5,8 +5,10 @@ import UIKit
 @MainActor
 final class ResultStageExampleScreen {
     private let measurements = ResultBasedRowMeasurements()
+    private let row = PlainTextRowView()
 
-    func height(for text: String, width: CGFloat) -> CGFloat {
-        measurements.height(for: text, width: width)
+    func size(for text: String, width: CGFloat) -> CGSize {
+        row.text = text
+        return measurements.size(of: row, toFit: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
     }
 }

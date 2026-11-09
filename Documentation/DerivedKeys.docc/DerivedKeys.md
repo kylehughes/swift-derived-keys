@@ -8,6 +8,8 @@ A model can change without changing the result of every calculation that consume
 
 Define a key for the inputs a particular calculation reads, independently of the model's general-purpose `Equatable` or `Hashable` conformance. Capture a consistent input state, build a request key from its relevant properties, and compute the result from that same captured input on a cache miss. Equal keys must imply interchangeable results. The library compares only what you select; it cannot determine whether you included every relevant input.
 
+Pass those keys to ``MemoizationCache`` to reuse results within a fixed capacity, or use the key-building APIs independently with your own storage.
+
 ## Reuse an export
 
 Retain a cache across requests, and capture the values the exporter reads. This exporter selects text and the uppercase option; changing selection leaves its request key equal.

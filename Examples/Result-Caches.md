@@ -1,8 +1,10 @@
 # Cache a result, then use it as input
 
-`ResultCache` and `MainActorResultCache` bind selected key paths and a calculation once. They can return a line count, an array of search tokens, or any other value. The calculation runs only when the selected values have no retained result.
+`ResultCache` and `MainActorResultCache` memoize a calculation: they reuse its result when the selected dependency values match a retained entry. Bind the key paths and calculation once, then look up results across requests. A result can be a line count, an array of search tokens, or any other value.
 
 Use `ResultCache` from `DerivedKeys` for nonisolated calculations. Use `MainActorResultCache` from `DerivedKeysUI` when the recipe reads main-actor state or calls UIKit. Neither type requires its input or result to be `Hashable`; only selected dependency values must be hashable.
+
+If you know React's [`useMemo`](https://react.dev/reference/react/useMemo), the dependency-list idea is familiar. `useMemo` compares dependencies with their previous-render values using `Object.is`. These caches compare snapshots of the selected `Hashable` values and retain multiple results up to their capacity. Requests A, B, then A can reuse the first result if its entry is still retained. You choose the cache's owner and call it explicitly; it does not observe changes or schedule rendering.
 
 ## Cache one computation
 
@@ -26,56 +28,82 @@ Retain the cache across requests. For an application model, select its relevant 
 
 `ResultCache` requires sendable key paths and a `@Sendable` calculation. These requirements keep actor-isolated reads out of the nonisolated cache API; ordinary nonisolated key-path literals infer the required conformance. When your key paths or calculation need main-actor access, use `MainActorResultCache`. Neither cache observes input changes or schedules work.
 
-## Pass a line count into a height cache
+## Use a line count to cache a view measurement
 
-A row layout can reuse two different results: text wrapping for a particular string and width, and the row height for a particular line count. Different strings can wrap to the same count and share the second result.
+For collection or table rows with consistent plain-text styling, you can cache measurement in two stages. First, cache the rendered line count by text, available width, and font. Then use that count and the remaining layout inputs to cache the view's actual `sizeThatFits(_:)` result. Different strings that occupy the same number of lines can share a measured size when those other inputs match.
 
-The [complete application example](../Sources/DerivedKeysUIExample/ResultBasedRowMeasurements.swift) defines `ResultBasedRowMeasurements`. This is example code to copy or adapt, not an installed library type. It uses TextKit to count actual line fragments. Its plain-text policy fixes the font, line height, wrapping, and padding for the bundle's lifetime; rendering must use that same policy. Empty text has zero lines. A paragraph separator at the end of nonempty text contributes a final empty line.
+The [complete application example](../Sources/DerivedKeysUIExample/ResultBasedRowMeasurements.swift) pairs `ResultBasedRowMeasurements` with `PlainTextRowView`, a row that fills the proposed width and renders text in a private TextKit 1 `UITextView`. It uses a uniform font, natural line heights, word wrapping, fixed paragraph settings, and no attachments. Both stages select the font; the second also selects horizontal and vertical padding. These are application types you can copy or adapt for your own cells.
 
-Inside that main-actor bundle, the cache declarations are:
+Inside the main-actor bundle, named tuples carry the inputs without custom request or key types:
 
 ```swift
-private let lineCounts: MainActorResultCache<(text: String, width: CGFloat), Int>
-private var rowHeights: ResultCache<Int, CGFloat>
+private let lineCounts: MainActorResultCache<(text: String, width: CGFloat, font: UIFont), Int>
+private let rowSizes: SizeCache<(view: PlainTextRowView, lineCount: Int)>
 ```
 
-The initializer configures both recipes. `lineCounter` is the example's private TextKit helper; `lineHeight` and `verticalPadding` are fixed values supplied at construction:
+The initializer binds both recipes. `lineCounter` counts actual TextKit line fragments using the same font and wrapping settings as the row:
 
 ```swift
 lineCounts = MainActorResultCache(
     dependingOn: \.text,
     \.width,
+    \.font,
     capacity: lineCountCapacity
 ) { input in
-    lineCounter.count(text: input.text, width: input.width)
+    lineCounter.count(text: input.text, width: input.width, font: input.font)
 }
-rowHeights = ResultCache(dependingOn: \.self, capacity: rowHeightCapacity) { count in
-    CGFloat(count) * lineHeight + verticalPadding
+rowSizes = SizeCache(
+    dependingOn: \.lineCount,
+    \.view.font,
+    \.view.horizontalPadding,
+    \.view.verticalPadding,
+    capacity: rowSizeCapacity
+) { input, proposal in
+    input.view.sizeThatFits(proposal)
 }
 ```
 
-A request resolves the stages explicitly:
+The bundle's lookup resolves the stages explicitly. `textWidth(for:)` subtracts per-side horizontal padding and validates a finite, positive available text width:
 
 ```swift
-let count = lineCounts.value(for: (text: text, width: width))
-let height = rowHeights.value(for: count)
+let count = lineCount(for: row.text, width: row.textWidth(for: proposal.width), font: row.font)
+return rowSizes.size(of: (view: row, lineCount: count), toFit: proposal)
 ```
 
-Named tuples carry multiple inputs without a custom request or key type. Only selected fields enter the key: `\.width` is necessary because width affects wrapping. These general-purpose caches do not automatically key, validate, or normalize fitting dimensions. The example validates finite positive width before lookup and expects the available text width after horizontal padding.
+Only the selected fields enter each key. Text changes select a new first-stage key; if the resulting count is unchanged, the second stage can hit without measuring the row. Width changes affect wrapping and the row's full `CGSize`, so width belongs in both stages. `MainActorResultCache` does not automatically key or validate dimensions; the example does that for its line counter. `SizeCache` automatically includes both fitting dimensions and validates the proposal.
 
-With the example's default typography and a width of 300 points, `"First"` and `"Second"` each occupy one line. Their text measurements have separate entries, while the height cache has one entry. Changing width selects another first-stage key; its resulting count determines whether the second stage can reuse a height. Returning to a retained text-and-width combination can reuse both results.
+For example, these two rows have separate text entries but share one row-size entry:
 
-This example's height formula is inexpensive. Calculate it directly when a second cache adds no useful savings. The two caches demonstrate result-based reuse, not a measured speedup. A hit still reads dependencies and hashes and compares snapshots.
+```swift
+let measurements = ResultBasedRowMeasurements()
+let firstRow = PlainTextRowView(text: "First")
+let secondRow = PlainTextRowView(text: "Second")
+let proposal = CGSize(width: 300, height: .greatestFiniteMagnitude)
+
+let firstSize = measurements.size(of: firstRow, toFit: proposal)
+let secondSize = measurements.size(of: secondRow, toFit: proposal)
+```
+
+Both strings occupy one line with the example's default font at this width. The first lookup measures `firstRow`; the second reuses that result. Returning to a retained text, width, and font combination can reuse both stages. Empty text counts as the text view's one empty line, and a trailing newline adds another line.
 
 ### Choose an owner and a layout policy
 
-A screen can retain one `ResultBasedRowMeasurements` bundle and supply heights to reusable rows. Pass authoritative model text directly; there is no need to read it back from a text view. The recipe captures the private TextKit helper, not its screen or bundle.
+A screen can share one bundle across reusable rows. Each row stores its authoritative Swift text and updates its private text view when text or font changes. The line-count recipe captures the private TextKit counter; the sizing recipe uses the row supplied for the current request. Neither recipe captures the screen or bundle, and entries do not implicitly retain rows. The screen still requests a new size and assigns the row's frame when inputs change.
 
-Recreate the example bundle when its fixed typography changes, including a resolved Dynamic Type change. Another application can represent variable style as selected dependencies. A line count alone cannot determine height when fonts, line spacing, paragraph spacing, attachments, or other geometry vary. Attributed text and variable line heights are outside this example's policy; the general cache APIs impose no text policy.
+This example selects font in both stages, so a newly resolved Dynamic Type font selects new keys. Padding changes select a new row-size key; horizontal padding also changes the wrapping width.
+
+If your cells share one fixed font between Dynamic Type changes, you can instead omit font from your own bundle's keys and reset the caches when it changes. Update the views' fonts and clear every affected cache before the next lookup: both the line-count and row-size caches, plus any dependent parent layout cache. Clearing a child does not clear its parents. With the example as written, replace the bundle to reset both stages.
+
+Reusing sizes by line count depends on the row's layout:
+
+- **Width:** The row fills the proposed width. Equal line counts do not determine text's natural width, so a view that fits its width to its text needs more than a line count in its key.
+- **Height:** In the UIKit test samples, this uniform text configuration produced equal fitted heights for equal line counts, including empty text, trailing newlines, emoji, and several scripts. A font's [`lineHeight`](https://developer.apple.com/documentation/uikit/uifont/lineheight) does not account for every layout: mixed fonts, paragraph spacing, and attachments can give equal counts different heights. For those layouts, pass richer measured geometry between stages or keep the original size-affecting dependencies in the size key. Check the content and rendering configuration your application supports before dropping text from that key.
+
+Measure the complete two-stage lookup against direct view fitting before choosing it for performance. Counting nonempty text's lines runs TextKit layout on a first-stage miss, and cache hits still capture, hash, and compare dependencies. This example has not demonstrated a speedup.
 
 ### How this differs from size-cache children
 
-Here the caller resolves the first cache and passes its output to the second. The second cache keys the computed line count, so different strings that wrap to the same number of lines can share one height entry.
+Here the caller resolves the first cache and passes its output to the second. The second cache keys the computed line count and the remaining layout inputs, so different strings that wrap to the same number of lines can share one measured size.
 
 `SizeCache` children contribute their original dependency values to a parent's key. That lets a parent hit skip its calculation and all child lookups. Use [size-cache composition](Size-Caches.md) when that behavior fits the layout; use explicit result stages when different inputs can produce the same intermediate result. Neither API discovers caches called by a recipe.
 
@@ -87,6 +115,6 @@ Here the caller resolves the first cache and passes its output to the second. Th
 
 Both caches retain their configured recipe. Entries retain selected snapshots and results without implicitly retaining input roots; selected reference values, results, and explicit captures can retain objects. Choose stable immutable projections when a hashable object has mutable aliases. Inputs must remain consistent from dependency selection through calculation, and the selected values must cover everything that can change the result.
 
-Each cache has its own capacity, including zero to disable storage. `removeValue(for:)` selects the input's current dependency values; `removeAll()` clears only that cache and keeps its recipe. Clearing either stage does not clear the other. If an undeclared external change affects both calculations, clear both caches or rebuild their owner.
+Each cache has its own capacity, including zero to disable storage. `removeValue(for:)` selects the input's current dependency values; `removeAll()` clears only that cache and keeps its recipe. Clearing either stage does not clear the other. If an undeclared external change affects both calculations, clear both caches or rebuild their owner. Clearing entries does not replace captured configuration; rebuild any recipe that captured an old font or other fixed setting.
 
 Configured recipes are synchronous and nonthrowing. For throwing calculations or explicit request keys, use the [generic core APIs](Generic-Core.md), including `MemoizationCache`. `SizeCache` remains the convenience for `CGSize` results with automatically keyed fitting proposals.

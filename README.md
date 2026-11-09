@@ -5,7 +5,7 @@
 [![Swift Versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkylehughes%2Fswift-derived-keys%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/kylehughes/swift-derived-keys)
 [![Test](https://github.com/kylehughes/swift-derived-keys/actions/workflows/ci.yml/badge.svg)](https://github.com/kylehughes/swift-derived-keys/actions/workflows/ci.yml)
 
-DerivedKeys builds cache keys from the values you select for a computation. With `DerivedKeysUI`, you cache a view's fitted size by listing the key paths that affect layout, then compose child caches to reuse a parent view's size. The underlying keys and bounded caches also work on their own for non-UI calculations.
+DerivedKeys provides **memoization** for Swift: reusing a calculation's result when the inputs you select match a cached entry. With `DerivedKeysUI`, you cache a view's fitted size by listing the key paths that affect layout, then compose child caches to reuse a parent view's size. The underlying key-building APIs also work independently of the caches.
 
 Use `DerivedKeysUI` for view sizing. For computations without UI, start with the [generic core](#use-the-generic-core).
 
@@ -225,7 +225,7 @@ assert(first == second)
 
 `ResultCache` is a value type: copying it gives independent entry mutation. Its calculation is synchronous and nonthrowing; inputs and results need not be `Hashable` or `Sendable`. Select every variable input the calculation reads, and keep selected values stable while stored.
 
-For main-actor recipes, use `MainActorResultCache` from `DerivedKeysUI`. The [result-cache guide](Examples/Result-Caches.md) shows named tuple inputs and two explicit stages: measure a string's rendered line count, then compute row height from that count. Text measurement and row layout remain application code.
+For main-actor recipes, use `MainActorResultCache` from `DerivedKeysUI`. The [result-cache guide](Examples/Result-Caches.md) shows how a plain-text row can cache its rendered line count by text, width, and font, then use that count and the remaining layout inputs to cache the view's `sizeThatFits(_:)` result.
 
 Use the [generic API guide](Examples/Generic-Core.md) for projections, typed operation keys, and runtime source graphs. `DependencySnapshot` composes heterogeneous captured values directly. `MemoizationCache` supports throwing calculations without insertion on failure, treats a cached optional `nil` as a hit, and gives copied cache values independent storage behavior. The [document export guide](Examples/Document-Export.md) demonstrates these lower-level APIs; run it with `swift run DocumentExportExample`.
 

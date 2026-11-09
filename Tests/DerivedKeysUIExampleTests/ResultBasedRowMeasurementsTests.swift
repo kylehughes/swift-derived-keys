@@ -5,150 +5,210 @@ import UIKit
 
 @MainActor
 struct ResultBasedRowMeasurementsTests {
-    @Test func differentTextsWithTheSameLineCountShareOnlyTheHeightEntry() {
+    @Test func equalLineCountsShareSizesAcrossDistinctStringsAndViews() {
         let measurements = ResultBasedRowMeasurements()
-        let first = measurements.height(for: "First", width: 300)
-        #expect(first == 40)
-        #expect(measurements.height(for: "Second", width: 300) == first)
+        let first = PlainTextRowView(text: "First")
+        let second = PlainTextRowView(text: "Second")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let expectedFirst = directSize(of: first, toFit: proposal)
+        let expectedSecond = directSize(of: second, toFit: proposal)
+        #expect(expectedFirst == expectedSecond)
+        #expect(measurements.size(of: first, toFit: proposal) == expectedFirst)
+        #expect(first.sizeThatFitsCallCount == 1)
+        #expect(measurements.size(of: second, toFit: proposal) == expectedSecond)
+        #expect(second.sizeThatFitsCallCount == 0)
         #expect(measurements.lineCountCalculationCount == 2)
         #expect(measurements.lineCountEntryCount == 2)
-        #expect(measurements.rowHeightEntryCount == 1)
+        #expect(measurements.rowSizeEntryCount == 1)
 
-        #expect(measurements.height(for: "First", width: 300) == first)
+        #expect(measurements.size(of: first, toFit: proposal) == expectedFirst)
+        #expect(first.sizeThatFitsCallCount == 1)
         #expect(measurements.lineCountCalculationCount == 2)
-        #expect(measurements.rowHeightEntryCount == 1)
     }
 
     @Test(arguments: [
-        (text: "", count: 0),
+        (text: "", count: 1),
         (text: "One", count: 1),
         (text: "One\nTwo", count: 2),
         (text: "One\n", count: 2),
         (text: "\n", count: 2),
         (text: "One\n\n", count: 3),
     ])
-    func emptyTextAndHardBreaksFollowTheFixedLineGrid(fixture: (text: String, count: Int)) {
+    func countsRenderedFragmentsAndFinalEmptyLines(fixture: (text: String, count: Int)) {
         let measurements = ResultBasedRowMeasurements()
-        let count = measurements.lineCount(for: fixture.text, width: 300)
-        #expect(count == fixture.count)
-        #expect(count == directLineCount(text: fixture.text, width: 300))
-        #expect(measurements.height(for: fixture.text, width: 300) == CGFloat(fixture.count) * 24 + 16)
+        let row = PlainTextRowView(text: fixture.text)
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        #expect(measurements.lineCount(for: row.text, width: 300, font: row.font) == fixture.count)
+        #expect(measurements.size(of: row, toFit: proposal) == directSize(of: row, toFit: proposal))
         #expect(measurements.lineCountCalculationCount == 1)
+        #expect(row.sizeThatFitsCallCount == 1)
     }
 
-    @Test func fixedTypographyAndPaddingBelongToTheBundle() {
-        let font = UIFont.systemFont(ofSize: 22)
-        let measurements = ResultBasedRowMeasurements(font: font, lineHeight: 36, verticalPadding: 10)
-        let text = "First line\nSecond line\n"
-        let count = directLineCount(text: text, width: 300, font: font, lineHeight: 36)
-        #expect(count == 3)
-        #expect(measurements.lineCount(for: text, width: 300) == count)
-        #expect(measurements.height(for: text, width: 300) == 118)
-        #expect(measurements.font == font)
-        #expect(measurements.lineHeight == 36)
-        #expect(measurements.verticalPadding == 10)
-    }
-
-    @Test func independentCapacitiesBoundEachStage() {
-        let measurements = ResultBasedRowMeasurements(lineCountCapacity: 1, rowHeightCapacity: 2)
-        _ = measurements.height(for: "One", width: 300)
-        _ = measurements.height(for: "Two", width: 300)
-        #expect(measurements.lineCountEntryCount == 1)
-        #expect(measurements.rowHeightEntryCount == 1)
-        _ = measurements.height(for: "One", width: 300)
-        #expect(measurements.lineCountCalculationCount == 3)
-        _ = measurements.height(for: "One\nTwo", width: 300)
-        _ = measurements.height(for: "One\nTwo\nThree", width: 300)
-        #expect(measurements.lineCountEntryCount == 1)
-        #expect(measurements.rowHeightEntryCount == 2)
-    }
-
-    @Test func modelStringMutationSelectsItsNewValueWithoutAViewReadback() {
-        struct Row {
-            let id: Int
-            var text: String
-        }
-        var row = Row(id: 7, text: "Original")
-        let original = row.text
+    @Test func representativePlainTextMatchesDirectViewMeasurementAcrossCounts() {
         let measurements = ResultBasedRowMeasurements()
-        #expect(measurements.height(for: row.text, width: 300) == 40)
+        let proposal = CGSize(width: 180, height: CGFloat.greatestFiniteMagnitude)
+        for text in [
+            "", "Short", "Wider words", "One\nTwo", "One\n", "One\n\n",
+            "Several words wrap across many lines when the available width becomes narrow.",
+            "😀 👨‍👩‍👧‍👦", "😀\n😀", "中文排版示例", "مرحبا بالعالم", "नमस्ते दुनिया", "ภาษาไทย",
+        ] {
+            let row = PlainTextRowView(text: text, horizontalPadding: 6, verticalPadding: 9)
+            #expect(measurements.size(of: row, toFit: proposal) == directSize(of: row, toFit: proposal))
+        }
+        #expect(measurements.lineCountEntryCount == 13)
+        #expect(measurements.rowSizeEntryCount > 1)
+        #expect(measurements.rowSizeEntryCount < measurements.lineCountEntryCount)
+    }
+
+    @Test func textMutationSynchronizesTheViewAndRestorationReusesBothStages() {
+        let measurements = ResultBasedRowMeasurements()
+        let row = PlainTextRowView(text: "Original")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let original = measurements.size(of: row, toFit: proposal)
         row.text.append("\nAdded")
-        #expect(row.id == 7)
-        #expect(measurements.height(for: row.text, width: 300) == 64)
+        let changed = measurements.size(of: row, toFit: proposal)
+        #expect(changed == directSize(of: row, toFit: proposal))
+        #expect(changed.height > original.height)
+        #expect(row.sizeThatFitsCallCount == 2)
         #expect(measurements.lineCountCalculationCount == 2)
-        #expect(measurements.rowHeightEntryCount == 2)
-        row.text = original
-        #expect(measurements.height(for: row.text, width: 300) == 40)
+        #expect(measurements.rowSizeEntryCount == 2)
+        row.text = "Original"
+        #expect(measurements.size(of: row, toFit: proposal) == original)
+        #expect(row.sizeThatFitsCallCount == 2)
         #expect(measurements.lineCountCalculationCount == 2)
     }
 
-    @Test func widthAndTextChangesRecomputeActualTextKitWrapping() {
+    @Test func widthChangesAreKeyedEvenWhenTheLineCountStaysTheSame() {
         let measurements = ResultBasedRowMeasurements()
-        let text = "Several words wrap across many lines when the available width becomes narrow."
-        let narrow = measurements.lineCount(for: text, width: 90)
-        let wide = measurements.lineCount(for: text, width: 400)
-        #expect(narrow > wide)
-        #expect(wide > 1)
-        #expect(narrow == directLineCount(text: text, width: 90))
-        #expect(wide == directLineCount(text: text, width: 400))
+        let row = PlainTextRowView(text: "Text", horizontalPadding: 8)
+        let narrow = CGSize(width: 200, height: CGFloat.greatestFiniteMagnitude)
+        let wide = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let narrowSize = measurements.size(of: row, toFit: narrow)
+        let wideSize = measurements.size(of: row, toFit: wide)
+        #expect(narrowSize == directSize(of: row, toFit: narrow))
+        #expect(wideSize == directSize(of: row, toFit: wide))
+        #expect(narrowSize.width == narrow.width)
+        #expect(wideSize.width == wide.width)
+        #expect(narrowSize.height == wideSize.height)
+        #expect(measurements.lineCount(for: row.text, width: 184, font: row.font) == 1)
+        #expect(measurements.lineCount(for: row.text, width: 284, font: row.font) == 1)
+        #expect(row.sizeThatFitsCallCount == 2)
         #expect(measurements.lineCountCalculationCount == 2)
-        #expect(measurements.height(for: text, width: 90) == CGFloat(narrow) * 24 + 16)
-        #expect(measurements.height(for: text, width: 400) == CGFloat(wide) * 24 + 16)
-        #expect(measurements.lineCountCalculationCount == 2)
-
-        let changed = text + "\n"
-        let changedCount = measurements.lineCount(for: changed, width: 90)
-        #expect(changedCount == narrow + 1)
-        #expect(changedCount == directLineCount(text: changed, width: 90))
-        #expect(measurements.lineCountCalculationCount == 3)
+        #expect(measurements.rowSizeEntryCount == 2)
     }
 
-    @Test func zeroCapacitiesComputeWithoutRetainingEntries() {
-        let measurements = ResultBasedRowMeasurements(lineCountCapacity: 0, rowHeightCapacity: 0)
-        #expect(measurements.height(for: "Text", width: 300) == 40)
-        #expect(measurements.height(for: "Text", width: 300) == 40)
-        #expect(measurements.lineCountCalculationCount == 2)
-        #expect(measurements.lineCountEntryCount == 0)
-        #expect(measurements.rowHeightEntryCount == 0)
-    }
-
-    /// An uncached control walks effective glyph ranges rather than the example's enumeration callback.
-    private func directLineCount(
-        text: String,
-        width: CGFloat,
-        font: UIFont = .systemFont(ofSize: 16),
-        lineHeight: CGFloat = 24
-    ) -> Int {
-        guard !text.isEmpty else { return 0 }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byWordWrapping
-        paragraph.minimumLineHeight = lineHeight
-        paragraph.maximumLineHeight = lineHeight
-        let storage = NSTextStorage(
-            string: text,
-            attributes: [.font: font, .paragraphStyle: paragraph]
+    @Test func narrowerWidthsChangeActualWrapping() {
+        let measurements = ResultBasedRowMeasurements()
+        let row = PlainTextRowView(text: "Several words wrap across many lines at a narrow available width.")
+        let narrow = CGSize(width: 90, height: CGFloat.greatestFiniteMagnitude)
+        let wide = CGSize(width: 400, height: CGFloat.greatestFiniteMagnitude)
+        let narrowSize = measurements.size(of: row, toFit: narrow)
+        let wideSize = measurements.size(of: row, toFit: wide)
+        #expect(narrowSize == directSize(of: row, toFit: narrow))
+        #expect(wideSize == directSize(of: row, toFit: wide))
+        #expect(narrowSize.height > wideSize.height)
+        #expect(
+            measurements.lineCount(for: row.text, width: 90, font: row.font)
+                > measurements.lineCount(for: row.text, width: 400, font: row.font)
         )
-        let layout = NSLayoutManager()
-        layout.usesFontLeading = false
-        let container = NSTextContainer(size: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
-        container.lineFragmentPadding = 0
-        container.lineBreakMode = .byWordWrapping
-        container.maximumNumberOfLines = 0
-        storage.addLayoutManager(layout)
-        layout.addTextContainer(container)
-        layout.ensureLayout(for: container)
-        var count = 0
-        var index = 0
-        while index < layout.numberOfGlyphs {
-            var range = NSRange()
-            _ = layout.lineFragmentRect(forGlyphAt: index, effectiveRange: &range)
-            index = NSMaxRange(range)
-            count += 1
-        }
-        if layout.extraLineFragmentTextContainer === container {
-            count += 1
-        }
-        return count
+        #expect(measurements.lineCountCalculationCount == 2)
+    }
+
+    @Test func fontChangesInvalidateBothStagesEvenWithEqualLineCounts() {
+        let measurements = ResultBasedRowMeasurements()
+        let row = PlainTextRowView(text: "Text")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let original = measurements.size(of: row, toFit: proposal)
+        row.font = .systemFont(ofSize: 28)
+        let changed = measurements.size(of: row, toFit: proposal)
+        #expect(changed == directSize(of: row, toFit: proposal))
+        #expect(changed.height > original.height)
+        #expect(measurements.lineCount(for: row.text, width: 300, font: row.font) == 1)
+        #expect(row.sizeThatFitsCallCount == 2)
+        #expect(measurements.lineCountCalculationCount == 2)
+        #expect(measurements.rowSizeEntryCount == 2)
+    }
+
+    @Test func paddingChangesUseTheSameInnerWidthInBothStages() {
+        let measurements = ResultBasedRowMeasurements()
+        let row = PlainTextRowView(text: "Text")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let original = measurements.size(of: row, toFit: proposal)
+        row.verticalPadding = 14
+        let vertical = measurements.size(of: row, toFit: proposal)
+        #expect(vertical == directSize(of: row, toFit: proposal))
+        #expect(vertical.height > original.height)
+        #expect(measurements.lineCountCalculationCount == 1)
+        row.horizontalPadding = 20
+        #expect(measurements.size(of: row, toFit: proposal) == directSize(of: row, toFit: proposal))
+        #expect(measurements.lineCountCalculationCount == 2)
+        #expect(measurements.lineCount(for: row.text, width: 260, font: row.font) == 1)
+        #expect(measurements.lineCountCalculationCount == 2)
+        #expect(measurements.rowSizeEntryCount == 3)
+        #expect(row.sizeThatFitsCallCount == 3)
+    }
+
+    @Test func proposedHeightParticipatesInTheSizeKey() {
+        let measurements = ResultBasedRowMeasurements()
+        let row = PlainTextRowView(text: "Text")
+        let first = measurements.size(of: row, toFit: CGSize(width: 300, height: 100))
+        let second = measurements.size(of: row, toFit: CGSize(width: 300, height: 200))
+        #expect(first == second)
+        #expect(row.sizeThatFitsCallCount == 2)
+        #expect(measurements.lineCountCalculationCount == 1)
+        #expect(measurements.rowSizeEntryCount == 2)
+    }
+
+    @Test func independentlyBoundedStagesEvictTheirOwnEntries() {
+        let measurements = ResultBasedRowMeasurements(lineCountCapacity: 1, rowSizeCapacity: 2)
+        let row = PlainTextRowView(text: "One")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let original = measurements.size(of: row, toFit: proposal)
+        row.text = "Two"
+        #expect(measurements.size(of: row, toFit: proposal) == original)
+        row.text = "One"
+        #expect(measurements.size(of: row, toFit: proposal) == original)
+        #expect(measurements.lineCountCalculationCount == 3)
+        #expect(row.sizeThatFitsCallCount == 1)
+        #expect(measurements.lineCountEntryCount == 1)
+        row.text = "One\nTwo"
+        _ = measurements.size(of: row, toFit: proposal)
+        row.text = "One\nTwo\nThree"
+        _ = measurements.size(of: row, toFit: proposal)
+        #expect(measurements.rowSizeEntryCount == 2)
+        row.text = "One"
+        #expect(measurements.size(of: row, toFit: proposal) == original)
+        #expect(row.sizeThatFitsCallCount == 4)
+        #expect(measurements.lineCountEntryCount == 1)
+        #expect(measurements.rowSizeEntryCount == 2)
+    }
+
+    @Test(arguments: [(line: 0, size: 2), (line: 2, size: 0), (line: 0, size: 0)])
+    func zeroCapacityDisablesOnlyThatStagesStorage(capacities: (line: Int, size: Int)) {
+        let measurements = ResultBasedRowMeasurements(
+            lineCountCapacity: capacities.line,
+            rowSizeCapacity: capacities.size
+        )
+        let row = PlainTextRowView(text: "Text")
+        let proposal = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        let expected = directSize(of: row, toFit: proposal)
+        #expect(measurements.size(of: row, toFit: proposal) == expected)
+        #expect(measurements.size(of: row, toFit: proposal) == expected)
+        #expect(measurements.lineCountCalculationCount == (capacities.line == 0 ? 2 : 1))
+        #expect(row.sizeThatFitsCallCount == (capacities.size == 0 ? 2 : 1))
+        #expect(measurements.lineCountEntryCount == (capacities.line == 0 ? 0 : 1))
+        #expect(measurements.rowSizeEntryCount == (capacities.size == 0 ? 0 : 1))
+    }
+
+    /// Measures an equivalent uncached view without changing the observed row's call counter.
+    private func directSize(of row: PlainTextRowView, toFit proposal: CGSize) -> CGSize {
+        PlainTextRowView(
+            text: row.text,
+            font: row.font,
+            horizontalPadding: row.horizontalPadding,
+            verticalPadding: row.verticalPadding
+        )
+        .sizeThatFits(proposal)
     }
 }
 #endif
