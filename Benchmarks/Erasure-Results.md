@@ -1,6 +1,6 @@
 # Concrete dependency erasure
 
-The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. The change removes an internal bottleneck, but does not establish that caching is always useful. For current application-sizing measurements, start with the [native-fitting results](UIKit-Native-Fitting-Results.md); the [UIKit benchmark guide](README.md) describes the methodology and other reports.
+The internal representation repair reduced the synthetic warm parent lookup from **2,658 to 83 µs per request**, about **32× faster**, in five before/after trials on 2026-10-28. The direct synthetic calculation still took about **42 µs**. The change removes an internal bottleneck, but does not establish that caching is always useful. For current application-sizing measurements, start with the [native-fitting results](UIKit-Native-Fitting-Results.md); the [UIKit benchmark guide](README.md) describes the methodology and other reports; the [specialization results](Specialization-Results.md) hold the latest paired comparison.
 
 ## What changed
 

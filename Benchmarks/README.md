@@ -1,37 +1,38 @@
 # UIKit sizing benchmarks
 
-These benchmarks compare direct UIKit fitting with `DerivedKeysUI.SizeCache`, including UIKit's own warmed measurement behavior. Choose a report for the question you want to investigate:
+These benchmarks compare direct UIKit fitting (`sizeThatFits(_:)`) against `DerivedKeysUI.SizeCache`, preserving UIKit's own warmed measurement behavior in the direct baseline. Pick the report that matches your question:
 
-- [Native fitting and composition](UIKit-Native-Fitting-Results.md): Simulator measurements of the current document example. Start here for application sizing.
-- [UIKit versus model strings](String-Results.md): a Simulator investigation of text-view lookup costs.
-- [Earlier recipe-based run](UIKit-Results.md): historical sizing evidence from the earlier example.
-- [Synthetic diagnostics](Synthetic.md): key and storage costs measured separately from UIKit fitting.
+- [Native fitting and composition](UIKit-Native-Fitting-Results.md): Simulator timings for the current document example. Start here when evaluating `SizeCache` for an app.
+- [Specialization and class-box snapshots](Specialization-Results.md): Paired synthetic trials and two sequential Simulator runs comparing `@inlinable` specialization and class-box leaf snapshots against the prior commit.
+- [UIKit versus model strings](String-Results.md): Simulator breakdown of `UITextView.text` versus native Swift model `String` lookup costs.
+- [Earlier recipe-based run](UIKit-Results.md): Historical sizing measurements from the earlier recipe-based example.
+- [Synthetic diagnostics](Synthetic.md): Key construction, hashing, and cache lookup costs isolated from UIKit fitting.
 
-A cache hit still reads dependencies and hashes and compares their snapshots. It helps when that work costs less than the measurement it avoids, often enough to cover misses and eviction. Fewer measurement calls alone do not establish a speedup.
+Every cache lookup still reads the selected key paths and hashes and compares the resulting snapshot. Caching pays off only when that lookup work costs less than the measurement it skips, often enough to outweigh misses and evictions. Fewer measurement calls alone do not prove a speedup.
 
 ## Run on a device or Simulator
 
-Select the package's Xcode 27.1 / Swift 6.4 toolchain. With no destination, the runner creates an iOS Simulator, runs the benchmark, then deletes only that Simulator:
+Select Xcode 27.1 (Swift 6.4). When invoked with no `--destination`, the runner creates a fresh iOS Simulator, runs the benchmark, and deletes only that Simulator afterward:
 
 ```sh
 python3 Benchmarks/run-uikit.py
 ```
 
-You can also supply an explicit Simulator destination; the runner preserves it. The runner builds the actual package in **Release**, disables code coverage and parallel testing, then runs one XCTest case from `DerivedKeysUIExampleTests`. No app product or dependency is added to the package. Outside a benchmark run, the test exercises a small correctness trace instead of skipping.
+If you pass an existing Simulator via `--destination`, the runner leaves it intact. In both cases, the script builds the package in **Release** with code coverage and parallel testing disabled, then runs the benchmark XCTest case in `DerivedKeysUIExampleTests` without adding an app target or external dependency. During normal `swift test` or `xcodebuild test` runs outside the benchmark script, that test case executes a short correctness trace instead of skipping.
 
-The runner accepts physical-device destinations and local signing arguments, but the current package scheme uses tool-hosted tests. Xcode 27.1 rejected device execution because it requires a host application. A connected-device build succeeded; no device timings were collected. Running this fixture on hardware requires an app-hosted test target, which this repository does not currently provide. The runner does not enable provisioning updates.
+The runner accepts physical-device destinations and local signing arguments (without enabling provisioning updates), and a connected-device build succeeded under Xcode 27.1. However, Xcode 27.1 rejected running the test on hardware because the package uses tool-hosted tests, which require a host application target not present in this repository; no physical-device timings were collected.
 
-The default `sizing` suite uses 128 requests per timed loop and nine paired trials per workload. Each cache has capacity 16, independent of those settings. Use `--iterations` (48–512), `--trials` (3–30), and `--output` (a new directory) to select another bounded sizing run. Keep generated evidence outside tracked source.
+The default `sizing` suite runs 128 requests per timed loop across 9 paired trials per workload, with each cache fixed at capacity 16 regardless of iteration count. You can customize a sizing run with `--iterations` (48–512), `--trials` (3–30), and `--output` (a new directory path; keep generated output outside tracked source).
 
-Run the focused string-representation comparison with:
+To run the string-representation comparison instead:
 
 ```sh
 python3 Benchmarks/run-uikit.py --suite strings
 ```
 
-The string suite uses a fixed 128 requests, nine trials, and capacity 16. It compares direct fitting, `UITextView.text` dependencies, authoritative model text, and explicit per-request UTF-8 conversion. It measures repeated requests, mutations with returns to previous content, and a bounded mixed trace. See its [results and timing boundaries](String-Results.md) for component diagnostics and validation.
+The `strings` suite fixes 128 requests, 9 trials, and capacity 16. It compares direct fitting, `UITextView.text` key-path reads, authoritative model `String` properties, and per-request `makeContiguousUTF8()` conversion across repeated requests, A-B-A mutations, and a bounded mixed trace. See [String-Results.md](String-Results.md) for the phase boundaries and results.
 
-The output includes the raw XCTest result, JSON attachment, commands, toolchain and destination metadata, candidate source fingerprints, and a receipt. The runner fails if tests are missing, comparisons fail, observations are incomplete, or source files change during execution. Its parser controls are available with:
+Each run writes the raw `.xcresult` bundle, extracted JSON attachment, exact commands, toolchain and destination metadata, source SHA-256 fingerprints, and a summary receipt. The runner exits with an error if any test is missing, direct and cached outputs disagree, observations are incomplete, or tracked source files change during the run. To run the runner's parser unit tests:
 
 ```sh
 python3 Benchmarks/test-run-uikit.py
@@ -39,7 +40,7 @@ python3 Benchmarks/test-run-uikit.py
 
 ## What is measured
 
-The following workload description covers the default sizing suite. All UIKit work runs synchronously on the main actor. Composed-document timings cover child sizing and final-size combination; frame assignment, drawing, and scrolling are outside this harness. The suite uses actual controls and the current [document example](../Sources/DerivedKeysUIExample/DocumentContentView.swift):
+All workloads in the default `sizing` suite run synchronously on the main actor against real UIKit views and the [`DocumentContentView`](../Sources/DerivedKeysUIExample/DocumentContentView.swift) example. Composed-document timings measure child sizing and final size combination; frame assignment, drawing, and scrolling are outside the harness.
 
 | Workload | Selected values and configuration |
 | --- | --- |
@@ -49,9 +50,12 @@ The following workload description covers the default sizing suite. All UIKit wo
 | Document text and button | The actual `DocumentSizeCaches.textSizes` and `buttonSizes` handles, selecting text, font, and maximum line count for the text view, and current title and title font for the button. |
 | Composed document | The actual parent cache, with the same child handles, proposal transformation, and combination used by the application example. |
 
-Inputs include a short title, a multiline paragraph, long text, and attributed content. Standalone controls use 17-, 24-, and 32-point fonts. Document views use the example's body font with large, accessibility-medium, and accessibility-extra-extra-extra-large content-size categories. Outer widths are 180 and 320 points. The document parent subtracts its fixed 12-point padding on each side; child fitting height is unconstrained. All other measurement settings are fixed for the recipe's lifetime. Document controls are configured eagerly at initialization and model or trait changes; getters only read controls.
+Test inputs cover a short title, a multiline paragraph, long body text, and attributed text:
 
-Prepared strings, standalone fonts, immutable attributed inputs, request traces, view creation, and result-buffer allocation are outside timing. The mixed trace uses 40 prepared semantic variants; callers still use ordinary UIKit key paths, with no custom dependency wrapper or aggregate sizing-input type.
+- Standalone controls test 17-, 24-, and 32-point fonts; document views use the example's body font across `.large`, `.accessibilityMedium`, and `.accessibilityExtraExtraExtraLarge` content-size categories.
+- Outer fitting widths are 180 and 320 points with unconstrained height; `DocumentContentView` subtracts its fixed 12-point horizontal padding on each side before measuring children.
+- All unselected view settings stay constant for the recipe's lifetime. `DocumentContentView` updates its subviews eagerly on initialization and on model or trait changes, so property getters only read existing control state.
+- Strings, fonts, immutable `NSAttributedString` instances, request schedules, views, and output buffers are allocated before timing starts. The mixed trace cycles through 40 prebuilt semantic variants using ordinary UIKit key paths—no custom dependency wrappers or aggregate input structs.
 
 ### Scenarios and timing boundaries
 
@@ -65,48 +69,51 @@ Prepared strings, standalone fonts, immutable attributed inputs, request traces,
 | Content or typography changes | Assign prepared content and font/category values before fitting, exercising relevant misses and subsequent reuse. |
 | Mixed bounded requests | A 48-request cycle contains adjacent repeats and new semantic inputs, with capacity 16. Content-dependent caches evict; the fixed-title document button's six width/category combinations fit without eviction. |
 
-Warm and equivalent-view rows are **measurement-only**: controls are configured before timing. Direct document measurements retain the configured controls and call their UIKit fitting methods without reassigning their content in the loop. This preserves UIKit's own warm behavior.
+- **Measurement-only scenarios (warm unchanged view, equivalent view instances, warm composed parent):** Views are configured before the timed loop. In the direct arm, `DocumentContentView` keeps its configured subviews and calls `sizeThatFits(_:)` without reassigning properties inside the loop, preserving UIKit's internal layout caches.
+- **Input-changing scenarios (content/typography changes, mixed bounded requests):** Both arms include the same property assignments inside the timed loop. For `DocumentContentView`, content/font and mixed rows update the entire view (including text assignment and content-size category propagation) even when timing the button child cache alone.
+- **Proposal- and spacing-only scenarios (width changes, parent-only spacing change):** Only the fitting proposal or parent `spacing` property changes inside the loop; neither triggers subview reconfiguration. On a parent-only spacing change, the direct arm still accesses and fits the unchanged children, while the cached parent misses and hits its warm child caches.
 
-Changing rows include the applicable configuration work in both arms. Content/font changes assign the same prepared values, eagerly synchronizing document controls in both arms. Document content/font and mixed rows configure the whole document, even when measuring only its button; those rows include text assignment and category propagation, not just button work.
-
-Width changes update only proposals, and spacing changes update only spacing; neither operation hides control configuration in a getter or setter. The parent-only row changes no child input, though a direct measurement still accesses and fits the children.
-
-Each trial creates independent direct and cached fixture sets. Warmup primes the cached entry before the final direct UIKit warmup, so configuration does not accidentally invalidate the direct baseline afterward. There are four direct warmup calls per warmed view; equivalent-view rows warm only their separate seed. Arm order alternates between trials. Both arms write their returned sizes into preallocated buffers; comparison, diagnostics, serialization, and attachment creation occur afterward. Loop and timer overhead are not subtracted.
+Each trial builds separate direct and cached fixture instances and alternates which arm runs first. Warmup primes the cache entry before performing four final direct `sizeThatFits(_:)` warmup calls per warmed view (equivalent-view rows warm only the ninth seed view) so cache setup never invalidates UIKit's warm state in the direct baseline. Timed loops write sizes into preallocated buffers without subtracting loop or clock overhead; equality checks, diagnostics, and JSON serialization run after timing finishes.
 
 ### Results and cache observations
 
-Every direct/cached size pair must match exactly and be finite with positive height. The report retains raw per-trial durations and checksums. Report medians and variability, absolute time per request, and cached/direct ratios; do not substitute measurement counts for elapsed-time results.
+Every timed pair of direct and cached `CGSize` results is verified after timing to be equal, finite, and positive in height. Reports include raw per-trial times, checksums, medians, min–max ranges, microseconds per request, and cached-to-direct ratios. Always evaluate wall-clock times rather than measurement call counts.
 
-Standalone controls use measurement-closure counters in a separate untimed diagnostic replay. Timed closures do not contain those counters.
+To verify cache behavior without adding counters to timed closures:
 
-The unmodified `DocumentSizeCaches` example has no measurement counters. To observe exact hits and misses, an untimed diagnostic pass replays each exact request prefix into fresh storage, then uses the public `count` and `removeSize(of:toFit:)` operations to test whether the next request is already present. A parent hit causes no child probe. A parent miss probes the actual child keys with their transformed proposals. Each prefix replay uses its own fresh storage, so removing an entry during a probe cannot affect later requests. This bounded, quadratic replay avoids changing the example or substituting a modeled LRU.
+- **Standalone controls** run a separate, untimed replay using measurement-closure counters.
+- **`DocumentSizeCaches`** runs an untimed prefix replay against fresh caches, using public `count` and `removeSize(of:toFit:)` calls to test whether the next request is already cached. A parent hit performs no child probe; a parent miss probes the child caches with their transformed proposals. Because each prefix runs in its own fresh cache, probing via `removeSize(of:toFit:)` never alters subsequent requests.
 
-Document hit/miss counts are direct membership observations. Document measurement counts are **inferred from misses**, rather than counted inside measurement closures. The JSON distinguishes these from standalone closure counters. Cache entry bounds and expected warm/parent-only paths are checked outside timing. Mixed traces must show both hits and misses and, for content-dependent caches, eviction.
+In the exported JSON, document hit/miss counts are direct membership observations, whereas document measurement counts are **inferred from misses** (distinct from standalone closure counters). Untimed assertions verify capacity bounds, warm hits, parent-only child hits, and that mixed traces produce both hits and misses (plus eviction on content-dependent caches).
 
-No allocation profiler is attached, and the UIKit harness does not report cache memory or allocation counts. Entry counts are not a memory measurement. Device and Simulator observations must be reported separately; Simulator timings do not predict physical-device timings.
+The UIKit harness does not attach an allocation profiler or measure heap bytes; cache `count` is an entry count, not a memory measurement. Report Simulator and physical-device timings separately—Simulator numbers do not predict hardware performance.
 
 ### Investigating lookup cost
 
-The same XCTest includes separate stable-input phases for warmed UIKit fitting, dependency capture, hashing a preconstructed snapshot, and a complete warm lookup. A fifth phase reads `UITextView.text`. These diagnostics use 512 operations and five trials per phase on the same warmed fixture, in fixed phase order. Snapshot and text reads write to 64 observation slots; size reads use a preallocated result buffer; hashes accumulate into an integer. Validation and checksums follow timing. The observation work is included, so subtracting these phases does not isolate equality or LRU bookkeeping. Use them to locate costs worth investigating, alongside the paired end-to-end measurements.
+Alongside the paired end-to-end runs, the XCTest fixture runs five isolated component phases on a warmed fixture (5 trials of 512 operations each, in fixed order):
+
+1. Warm UIKit `sizeThatFits(_:)`.
+2. Dependency snapshot capture.
+3. Hashing a preconstructed `DependencySnapshot`.
+4. Full warm `SizeCache` lookup.
+5. Reading `UITextView.text` (`UITextView` workload only).
+
+Each phase includes its own observation sink (64 rotating slots for snapshots and strings, a preallocated buffer for sizes, and an integer accumulator for hashes), so you cannot subtract one phase from another to isolate equality or LRU bookkeeping. Use these component phases to spot where lookup time is spent before inspecting end-to-end workloads.
 
 ## Choosing dependencies for an application
 
-Use ordinary stable values first. The core retains each selected value behind a private generic wrapper before erasure, preserving that value's concrete hashing and equality. Callers do not need to wrap arrays or other values to avoid element-wise erasure inside `AnyHashable`.
+Start by selecting ordinary, stable properties directly. `DependencySnapshot` boxes each selected leaf value in a private generic class that preserves its concrete `Hashable` implementation without `AnyHashable`, so you do not need custom wrapper structs around arrays or strings to avoid element-by-element erasure.
 
-If a model already owns the authoritative text, select it by key path and keep the rendered view synchronized. The [model-text example](../Examples/Size-Caches.md#select-authoritative-model-text) uses `\.model.text` and the actual font. In the Simulator string comparison, identical long ASCII text cost 62.98 µs to hash after a UIKit read versus 1.26 µs from native model storage. Complete warm requests cost 149.75 versus 3.56 µs. This fixture demonstrates representation-related lookup costs with an unchanged generic core. It does not isolate the causes of differences between the historical and current sizing reports.
+When a model already holds the authoritative text, select the model's `String` key path (such as `\.model.text`) and keep the rendered view synchronized. In the [Simulator string comparison](String-Results.md), hashing a long ASCII string read back from `UITextView.text` took 62.98 µs (149.75 µs for a full warm lookup) because `UITextView.text` returns an `NSString`-bridged string, whereas hashing the same text from a native Swift model `String` took 1.26 µs (3.56 µs for a full warm lookup). Calling `makeContiguousUTF8()` on the bridged string every request lowered the warm lookup to 36.70 µs (including conversion), which is still much slower than reading the model property directly—and on changing-input workloads, view configuration and text layout dominated both. Note that model strings can also be bridged or noncontiguous; always measure your actual request path rather than normalizing strings blindly. See the [model-text example](../Examples/Size-Caches.md#select-authoritative-model-text) for the synchronization pattern.
 
-Explicitly making the UIKit string contiguous on every request improved that warm lookup to 36.70 µs, including conversion. It remained more expensive than selecting the existing model value, and changing-input workloads were dominated by configuration and measurement. The [full results](String-Results.md) include non-ASCII content, variability, and the limits of this comparison. Model strings can also have noncontiguous storage. Do not assume a storage representation from the property's type, or normalize every string without measuring the complete request.
-
-If full-content hashing remains a measured bottleneck, consider a compact content identity and revision projection under the [application guide's complete revision contract](../Examples/Size-Caches.md#consider-a-compact-projection-after-measuring). That guide defines the correctness requirements for revisions, reuse, and independent layout inputs.
-
-Profile the application's actual hit rate, content, and fitting methods before choosing this projection. A small view with an inexpensive warm UIKit fit may be better served by direct measurement or one stored result. See the [README](../README.md) for the sizing and recursive reuse API.
+If hashing long text remains a measured bottleneck even with native strings, you can project a content ID paired with a revision counter under the [sizing guide's revision contract](../Examples/Size-Caches.md#consider-a-compact-projection-after-measuring), alongside any typography and layout dependencies. Profile your hit rate, text lengths, and direct UIKit fitting cost first: for a small control whose warm `sizeThatFits(_:)` is already sub-microsecond (such as `UILabel`), direct measurement or caching a single last-known size is often faster than a keyed cache lookup. See the [README](../README.md) for the full `SizeCache` API.
 
 ## Synthetic diagnostics
 
-Run the existing macOS release diagnostics with:
+Run the standalone macOS release benchmarks for the generic core and `SizeCache` with:
 
 ```sh
 Benchmarks/run.sh
 ```
 
-The [diagnostic methodology](Synthetic.md) separates snapshot construction, hashing, warm lookup, misses, and storage behavior. The [erasure comparison](Erasure-Results.md) records the internal representation repair. Historical samples remain available in [generic results](Results.md) and [size-facade results](Size-Results.md); their original toolchains, source fingerprints, and measurement limits still apply.
+See [Synthetic.md](Synthetic.md) for the synthetic workload definitions, [Erasure-Results.md](Erasure-Results.md) for the earlier `AnyHashable`-removal comparison, and [Specialization-Results.md](Specialization-Results.md) for the `@inlinable` and class-box comparison. Earlier single-run baselines remain in [Results.md](Results.md) and [Size-Results.md](Size-Results.md) under their original toolchains and source revisions.
