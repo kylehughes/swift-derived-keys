@@ -210,7 +210,7 @@ DerivedKeys is not accepting source contributions at this time. Bug reports will
 
 DerivedKeys was implemented from Kyle Hughes' technical specification using the Swift Package Factory workflow and Codex.
 
-## Author
+## "Author"
 
 [Kyle Hughes](https://kylehugh.es)
 
